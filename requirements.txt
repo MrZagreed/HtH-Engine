@@ -1,0 +1,13 @@
+# Основные
+pypresence>=4.3.0
+spotipy>=2.23.0
+requests>=2.31.0
+beautifulsoup4>=4.12.2
+aiohttp>=3.9.1
+numpy>=1.26.0
+cryptography>=41.0.7
+
+# Утилиты/диагностика
+colorama>=0.4.6
+psutil>=5.9.8
+packaging>=24.0
