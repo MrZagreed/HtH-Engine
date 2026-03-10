@@ -81,10 +81,8 @@ async def lyrics_engine(
 ):
     display = SmartLyricsDisplay(
         max_lines=int(config.get("lyrics_rpc_lines", 3)),
-        max_line_length=int(config.get("lyrics_rpc_line_length", 26)),
+        max_line_length=int(config.get("lyrics_rpc_line_length", 42)),
         min_interval_s=float(config.get("lyrics_rpc_render_interval", 0.2)),
-        page_flip_interval_s=float(config.get("lyrics_rpc_page_flip_interval", 0.9)),
-        next_preview_ratio=float(config.get("lyrics_rpc_next_preview_ratio", 0.5)),
     )
     warp = TimeWarp(
         max_drift_ms=config.get("max_drift_ms", 7000),
