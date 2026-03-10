@@ -1,8 +1,10 @@
-# Highway to Hell Engine (Pre-release)
+# HtH Engine (Pre-release)
 
 [Русская версия](README_ru.md)
 
 Real-time Spotify -> Discord Rich Presence with synchronized lyrics.
+
+Note: `HtH` is a reference to AC/DC's song `Highway to Hell`.
 
 ## Zero-knowledge quick start
 1. Download/unpack this project anywhere.
@@ -109,7 +111,7 @@ Step by step, that simple monolithic script became a full modular project. The p
 
 Today, **March 10, 2026**, as I am finishing my fourth year and now 20 years old, I can finally say I brought this project to a state I am truly satisfied with.
 
-For me, **Highway to Hell Engine** is more than just code. It is a journey from a small experiment of a few hundred lines to a complete tool that grew together with my knowledge.
+For me, **HtH Engine** is more than just code. It is a journey from a small experiment of a few hundred lines to a complete tool that grew together with my knowledge.
 
 I sincerely hope this application will be useful to someone else.
 
@@ -122,4 +124,6 @@ March 10, 2026
 
 ## Current pre-release version
 `0.9.0-pre`
+
+
 

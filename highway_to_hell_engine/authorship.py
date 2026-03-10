@@ -3,10 +3,10 @@ from typing import Dict, Any
 
 from .logging_setup import log
 
-PROJECT_NAME = "Highway to Hell Engine"
+PROJECT_NAME = "HtH Engine"
 AUTHOR_NAME = "Mr.Zagreed"
 AUTHOR_NOTICE = "Discord Karaoke RPC by Mr.Zagreed"
-AUTHORSHIP_PROOF_SHA256 = "2da6d893c1f398cf31eeb09d1171f4be86c8fb0f4824f4975d4393c0933f3e34"
+AUTHORSHIP_PROOF_SHA256 = "55377ad467bf8e74665cb5ea2bb5ecea9079cf010cf19b4d0d09082f33b9d230"
 
 
 def _proof_payload() -> str:
@@ -51,3 +51,4 @@ __all__ = [
     "verify_authorship_proof",
     "enforce_authorship",
 ]
+

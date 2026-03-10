@@ -346,7 +346,7 @@ async def run_presence(
 
 async def main(config: Dict[str, Any], mode: str = "api") -> None:
     enforce_authorship(config)
-    log(f"=== STARTING HIGHWAY TO HELL ENGINE v{__version__} ===", "INFO", "main")
+    log(f"=== STARTING HTH ENGINE v{__version__} ===", "INFO", "main")
     log(f"Mode: {mode.upper()}", "INFO", "main")
     log(f"Main log: {LOG_FILE}", "INFO", "main")
     log(f"Debug log: {DEBUG_LOG_FILE}", "INFO", "main")
