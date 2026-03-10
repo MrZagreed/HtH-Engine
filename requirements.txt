@@ -1,4 +1,4 @@
-# Основные
+# Основные зависимости
 pypresence>=4.3.0
 spotipy>=2.23.0
 requests>=2.31.0
@@ -7,7 +7,13 @@ aiohttp>=3.9.1
 numpy>=1.26.0
 cryptography>=41.0.7
 
-# Утилиты/диагностика
+# Утилиты и диагностика
 colorama>=0.4.6
 psutil>=5.9.8
 packaging>=24.0
+
+# Локальный мониторинг Spotify (без Premium)
+swspotify==1.2.3; python_version < "3.12"
+
+# Windows media session progress for local mode
+winsdk==1.0.0b10; sys_platform == "win32"

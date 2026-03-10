@@ -1,7 +1,8 @@
 import asyncio
 import time
 import traceback
-from typing import List, Tuple, Dict, Any
+from urllib.parse import urlparse
+from typing import List, Tuple, Dict, Any, Callable, Optional
 
 from .logging_setup import log
 from .display import SmartLyricsDisplay
@@ -22,62 +23,93 @@ def _fmt_time(ms: int) -> str:
     s = ms // 1000
     return f"{s // 60:02d}:{s % 60:02d}"
 
-def _clamp(v, lo, hi): 
+def _clamp(v, lo, hi):
     return lo if v < lo else hi if v > hi else v
+
+def _safe_spotify_url(url: str) -> Optional[str]:
+    try:
+        parsed = urlparse((url or "").strip())
+        if parsed.scheme != "https":
+            return None
+        if parsed.netloc.lower() not in {"open.spotify.com", "spotify.link"}:
+            return None
+        return parsed.geturl()
+    except Exception:
+        return None
 
 async def lyrics_engine(
     song: str,
     artist: str,
     lyrics_data: List[Tuple[int, str]],
-    duration_ms: int,
+    duration_state: Dict[str, Any],
     url: str,
     rpc,
     rpc_lock,
     rpc_error_state,
-    shutdown_event: asyncio.Event
+    shutdown_event: asyncio.Event,
+    get_track_func: Callable[[], Optional[Dict[str, Any]]],
+    config: dict  # добавлен параметр конфига
 ):
     display = SmartLyricsDisplay(min_interval_s=0.2)
-    warp = TimeWarp(max_drift_ms=7000, aggressive_correction=True)
+    warp = TimeWarp(
+        max_drift_ms=config.get("max_drift_ms", 7000),
+        aggressive_correction=config.get("aggressive_correction", True)
+    )
 
     last_push_wall = time.time()
-    last_pushed_ms: int | None = None
+    last_pushed_ms: Optional[int] = None
     last_update_time = 0.0
-    heartbeat_every = 9.5
+    heartbeat_every = config.get("heartbeat_interval", 9.5)
 
-    stats = {"updates_sent": 0, "boundary_updates": 0, "heartbeat_updates": 0, "consecutive_failures": 0, "last_update_time": 0.0}
+    stats = {
+        "updates_sent": 0,
+        "boundary_updates": 0,
+        "heartbeat_updates": 0,
+        "consecutive_failures": 0,
+        "last_update_time": 0.0
+    }
 
     flip = False
     ZERO_WIDTH = "\u200b"
 
     async def push(progress_ms: int, boundary: bool, force_update: bool):
         nonlocal last_update_time, flip
-        # финальные клампы перед отрисовкой
-        progress_ms = _clamp(progress_ms, 0, max(0, duration_ms))
+        current_duration_ms = int(duration_state.get("ms", 0) or 0)
+        duration_is_estimate = bool(duration_state.get("estimated", False))
+        progress_ms = _clamp(progress_ms, 0, max(0, current_duration_ms))
 
         state = display.render(lyrics_data, progress_ms)
-        bar = _bar(progress_ms, duration_ms)
-        time_txt = f"{_fmt_time(progress_ms)} / {_fmt_time(duration_ms)}"
+        bar = _bar(progress_ms, current_duration_ms)
+        time_txt = f"{_fmt_time(progress_ms)} / {_fmt_time(current_duration_ms)}"
 
         flip = not flip
         suffix = ZERO_WIDTH if flip else ""
 
-        payload: Dict[str, Any] = dict(
-            details=f"{artist} — {song}"[:128],
-            state=f"{state}\n{bar} {time_txt}{suffix}"[:128],
-            large_image="spotify",
-            large_text=song[:126],
-            small_image="play",
-            small_text="Текст песни",
-            buttons=[{"label": "Слушать в Spotify", "url": url}],
-            instance=True
-        )
+        payload: Dict[str, Any] = {
+            "details": f"{artist} — {song}"[:128],
+            "state": f"{state}\n{bar} {time_txt}{suffix}"[:128],
+            "instance": True
+        }
+
+        safe_url = _safe_spotify_url(url)
+        if safe_url:
+            payload["buttons"] = [{"label": "Open in Spotify", "url": safe_url}]
+
+        large_image = config.get("discord_large_image")
+        if large_image:
+            payload["large_image"] = str(large_image)
+            payload["large_text"] = str(config.get("discord_hover_text", "Discord Karaoke RPC by Mr.Zagreed"))[:126]
+
+        small_image = config.get("discord_small_image")
+        if small_image:
+            payload["small_image"] = str(small_image)
+            payload["small_text"] = "Lyrics Sync"
 
         now = time.time()
-        if duration_ms > 0:
-            payload.update({
-                "start": int(now - (progress_ms / 1000.0)),
-                "end": int(now + (max(0, duration_ms - progress_ms) / 1000.0))
-            })
+        if current_duration_ms > 0:
+            payload["start"] = int(now - (progress_ms / 1000.0))
+            if (not duration_is_estimate) or len(lyrics_data) >= 2:
+                payload["end"] = int(now + (max(0, current_duration_ms - progress_ms) / 1000.0))
 
         success = await safe_rpc_update(rpc, payload, rpc_lock, rpc_error_state)
         if success:
@@ -86,7 +118,7 @@ async def lyrics_engine(
         else:
             stats["consecutive_failures"] += 1
             if stats["consecutive_failures"] > 3:
-                log(f"МНОГО ОШИБОК RPC: {stats['consecutive_failures']} подряд", "WARNING", "engine")
+                log(f"Много ошибок RPC: {stats['consecutive_failures']} подряд", "WARNING", "engine")
 
         if boundary:
             stats["boundary_updates"] += 1
@@ -95,9 +127,9 @@ async def lyrics_engine(
 
     # Инициализация
     try:
-        now_play = await asyncio.to_thread(rpc.spotify.current_user_playing_track)
+        now_play = await asyncio.to_thread(get_track_func)
     except Exception as e:
-        log(f"Spotify API ошибка при старте движка: {e}", "ERROR", "engine")
+        log(f"Ошибка получения трека при старте движка: {e}", "ERROR", "engine")
         now_play = None
 
     if not now_play or not now_play.get("is_playing") or not now_play.get("item"):
@@ -107,7 +139,6 @@ async def lyrics_engine(
     init_progress = int(now_play.get("progress_ms") or 0)
     ts = int(now_play.get("timestamp") or int(time.time() * 1000))
     now_ms = int(time.time() * 1000)
-    # Компенсация задержки клампится: от -0.5 до +1.5 сек
     lag_ms = _clamp(now_ms - ts, -500, 1500)
     init_reported_now = max(0, init_progress + lag_ms)
 
@@ -122,10 +153,11 @@ async def lyrics_engine(
     last_idx = -1
     last_reported = init_reported_now
 
+    # Основной цикл
     while not shutdown_event.is_set():
         start_loop = time.time()
         try:
-            now_play = await asyncio.to_thread(rpc.spotify.current_user_playing_track)
+            now_play = await asyncio.to_thread(get_track_func)
             if not now_play or not now_play.get("is_playing"):
                 await asyncio.sleep(0.5)
                 continue
@@ -136,29 +168,26 @@ async def lyrics_engine(
             lag_ms = _clamp(now_ms - ts, -500, 1500)
             reported_now = max(0, progress + lag_ms)
 
-            # защита от аномальных скачков reported (редкие глюки API)
+            # Защита от аномальных скачков
             if reported_now < last_reported - 3000:
-                log(f"скачок назад в reported: {last_reported} -> {reported_now}, принудительный снап", "WARNING", "engine")
+                log(f"Скачок назад в reported: {last_reported} -> {reported_now}, принудительный снап", "WARNING", "engine")
                 reported_now = last_reported
             last_reported = reported_now
 
-            # Что мы показываем: последний пуш + прошедшее локальное время
             shown_estimate = last_pushed_ms if last_pushed_ms is not None else reported_now
             dt = (time.time() - last_push_wall) * 1000.0
             shown_estimate = max(0, int(shown_estimate + dt))
 
-            # жёсткий рельс: нельзя обгонять репорт более чем на 2 секунды
+            # Не обгонять reported более чем на 2 сек
             lead_cap = 2000
             if shown_estimate > reported_now + lead_cap:
                 shown_estimate = reported_now + lead_cap
 
             corrected = warp.update(reported_now, shown_estimate)
-
-            # финальная страховка: не убегать от reported дальше чем на ±2с
             corrected = _clamp(corrected, reported_now - 2000, reported_now + 2000)
-            corrected = _clamp(corrected, 0, max(0, duration_ms))
+            corrected = _clamp(corrected, 0, max(0, int(duration_state.get("ms", 0) or 0)))
 
-            # текущая строка для границ
+            # Определение границы строки
             idx = -1
             for i in range(len(lyrics_data) - 1):
                 if lyrics_data[i][0] <= corrected < lyrics_data[i+1][0]:
@@ -182,13 +211,14 @@ async def lyrics_engine(
 
             if stagnation_count > 10:
                 force = True
-                log("Обнаружено залипание прогресса Spotify, принудительное обновление", "DEBUG", "engine")
+                log("Залипание прогресса Spotify, принудительное обновление", "DEBUG", "engine")
 
             if (now_wall - stats["last_update_time"]) >= heartbeat_every:
                 force = True
                 stats["heartbeat_updates"] += 1
 
-            min_interval = 0.9
+            # Увеличен интервал до ~1 сек (было 0.9)
+            min_interval = config.get("min_update_interval", 1.2)
             need_push = force or boundary or ((now_wall - last_update_time) >= min_interval)
 
             if need_push:
@@ -198,7 +228,7 @@ async def lyrics_engine(
                 last_update_time = now_wall
 
             processing_time = time.time() - start_loop
-            sleep_time = max(0.05, 0.22 - processing_time)
+            sleep_time = max(0.05, 1.0 - processing_time)  # было 0.22, теперь 1.0
             await asyncio.sleep(sleep_time)
 
         except asyncio.CancelledError:
