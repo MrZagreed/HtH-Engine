@@ -160,9 +160,17 @@ async def run_presence(
     rpc_lock = asyncio.Lock()
     rpc_error = {"fails": 0, "suspended": False}
     net = NetworkMonitor()
-    cache_ttl = config.get("cache_ttl_local", 0.35) if mode == "local" else config.get("cache_ttl", 2.0)
-    poll_interval = config.get("poll_interval_local", 0.35) if mode == "local" else config.get("poll_interval", 1.0)
+    cache_ttl = config.get("cache_ttl_local", 0.25) if mode == "local" else config.get("cache_ttl", 2.0)
+    poll_interval = config.get("poll_interval_local", 0.25) if mode == "local" else config.get("poll_interval", 1.0)
     track_cache = TrackCache(ttl=cache_ttl)
+
+    runtime_config = dict(config)
+    if mode == "local":
+        runtime_config["min_update_interval"] = float(config.get("min_update_interval_local", 0.35))
+        runtime_config["heartbeat_interval"] = float(config.get("heartbeat_interval_local", 3.0))
+        runtime_config["engine_tick_interval"] = float(config.get("engine_tick_interval_local", 0.25))
+    else:
+        runtime_config["engine_tick_interval"] = float(config.get("engine_tick_interval", 1.0))
 
     lyrics_task: Optional[asyncio.Task] = None
     lyrics_loader_task: Optional[asyncio.Task] = None
@@ -314,7 +322,7 @@ async def run_presence(
                     rpc_error,
                     shutdown_event,
                     get_track_func,
-                    config,
+                    runtime_config,
                 )
             )
 
@@ -353,3 +361,4 @@ async def main(config: Dict[str, Any], mode: str = "api") -> None:
     finally:
         shutdown_event.set()
         log("Application finished", "INFO", "main")
+

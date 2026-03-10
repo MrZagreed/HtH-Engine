@@ -94,7 +94,9 @@ async def lyrics_engine(
     last_push_wall = time.time()
     last_pushed_ms: Optional[int] = None
     last_update_time = 0.0
-    heartbeat_every = config.get("heartbeat_interval", 9.5)
+    heartbeat_every = float(config.get("heartbeat_interval", 9.5))
+    tick_interval = float(config.get("engine_tick_interval", 1.0))
+    tick_interval = max(0.1, min(1.5, tick_interval))
 
     stats = {
         "updates_sent": 0,
@@ -265,7 +267,7 @@ async def lyrics_engine(
                 force = True
                 stats["heartbeat_updates"] += 1
 
-            min_interval = config.get("min_update_interval", 1.2)
+            min_interval = float(config.get("min_update_interval", 1.2))
             need_push = force or boundary or ((now_wall - last_update_time) >= min_interval)
 
             if need_push:
@@ -275,7 +277,7 @@ async def lyrics_engine(
                 last_update_time = now_wall
 
             processing_time = time.time() - start_loop
-            sleep_time = max(0.05, 1.0 - processing_time)  # tuned sleep floor
+            sleep_time = max(0.02, tick_interval - processing_time)
             await asyncio.sleep(sleep_time)
 
         except asyncio.CancelledError:
