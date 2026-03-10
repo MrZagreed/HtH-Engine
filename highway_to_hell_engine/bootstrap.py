@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import os
 import sys
-import time
 import subprocess
 from pathlib import Path
 from typing import Iterable, Optional
@@ -321,13 +320,10 @@ def ensure_env_and_reexec() -> None:
     print(f"[bootstrap] Re-executing in venv: {venv_python}\n")
 
     if os.name == "nt":
-        try:
-            os.execv(str(venv_python), new_argv)
-        except Exception:
-            cmd = subprocess.list2cmdline(new_argv)
-            subprocess.Popen(cmd, shell=True)
-            time.sleep(1)
-            raise SystemExit(0)
+        # On Windows, re-launch via subprocess without shell so paths with
+        # spaces (e.g. "Python is trash") stay intact.
+        completed = subprocess.run(new_argv, check=False)
+        raise SystemExit(completed.returncode)
 
     os.execv(str(venv_python), new_argv)
 
