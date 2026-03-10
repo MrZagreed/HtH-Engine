@@ -15,6 +15,7 @@ from .engine import lyrics_engine
 from .network import NetworkMonitor
 from .diagnostics import discord_running, is_spotify_ad
 from .app_paths import SPOTIFY_CACHE_FILE, ensure_app_dirs
+from .authorship import enforce_authorship
 from . import __version__
 
 # Track fetch function type
@@ -35,6 +36,7 @@ def _presence_assets(config: Dict[str, Any]) -> Dict[str, str]:
         payload["small_text"] = "Lyrics Sync"
     return payload
 
+
 def _safe_spotify_url(url: str) -> Optional[str]:
     try:
         parsed = urlparse((url or "").strip())
@@ -53,8 +55,10 @@ def _buttons_payload(url: str) -> Optional[list[Dict[str, str]]]:
         return None
     return [{"label": "Open in Spotify", "url": safe}]
 
+
 class TrackCache:
     """Simple track data cache to reduce API calls."""
+
     def __init__(self, ttl: float = 2.0):
         self.ttl = ttl
         self._data: Optional[Dict[str, Any]] = None
@@ -70,6 +74,7 @@ class TrackCache:
         except Exception:
             self._data = None
         return self._data
+
 
 async def _load_lyrics_background(lines_target: list, duration_state: Dict[str, Any], song: str, artist: str, dur: int) -> None:
     log(f"Loading lyrics: {song} - {artist}", "INFO", "lyrics")
@@ -96,10 +101,11 @@ async def _load_lyrics_background(lines_target: list, duration_state: Dict[str, 
 
     log(f"Lyrics: {len(lines_target)} lines -> {song} - {artist}", "INFO", "lyrics")
 
+
 async def run_presence(
     config: Dict[str, Any],
     shutdown_event: asyncio.Event,
-    mode: str
+    mode: str,
 ) -> None:
     ensure_app_dirs()
 
@@ -112,6 +118,7 @@ async def run_presence(
         log(f"Failed to connect to Discord RPC: {e}", "ERROR", "main")
         if not discord_running():
             log("Discord is not running. Waiting for startup...", "WARNING", "main")
+
         async def ensure():
             while not shutdown_event.is_set():
                 try:
@@ -119,23 +126,26 @@ async def run_presence(
                     return
                 except Exception:
                     await asyncio.sleep(2.0)
+
         asyncio.create_task(ensure())
 
     # ---------- Data source selection ----------
     get_track_func: GetTrackFunc
     server = None
 
-    if mode == 'api':
+    if mode == "api":
         server = LocalHttpsServer(8888)
         redirect_uri = await server.start()
-        sp = Spotify(auth_manager=SpotifyOAuth(
-            client_id=config["spotify_client_id"],
-            client_secret=config["spotify_secret"],
-            redirect_uri=redirect_uri,
-            scope="user-read-currently-playing user-read-playback-state",
-            cache_path=str(SPOTIFY_CACHE_FILE),
-            open_browser=False
-        ))
+        sp = Spotify(
+            auth_manager=SpotifyOAuth(
+                client_id=config["spotify_client_id"],
+                client_secret=config["spotify_secret"],
+                redirect_uri=redirect_uri,
+                scope="user-read-currently-playing user-read-playback-state",
+                cache_path=str(SPOTIFY_CACHE_FILE),
+                open_browser=False,
+            )
+        )
         rpc.spotify = sp  # backward compatibility
         get_track_func = lambda: sp.current_user_playing_track()
         log("API mode: using Spotify Web API (Premium required)", "INFO", "main")
@@ -163,13 +173,44 @@ async def run_presence(
     current_track_id = None
     idle_presence_sent = False
     last_wait_log = 0.0
+    last_net_diag_log = 0.0
 
     log("Starting main loop...", "INFO", "main")
     while not shutdown_event.is_set():
-        # Network check before requests
-        if not net.check():
-            await asyncio.sleep(5)
-            continue
+        # Network diagnostics before requests.
+        net_ok, net_latency_ms, _ = net.check_with_latency(timeout=0.9)
+        if not net_ok:
+            fail_count = net.consecutive_failures
+            now_diag = time.time()
+            if fail_count == 1 or fail_count % 5 == 0 or (now_diag - last_net_diag_log) >= 20.0:
+                snap = net.diagnostics_snapshot()
+                log(
+                    f"NETWORK DIAG | offline={snap['outage_seconds']:.1f}s fails={snap['consecutive_failures']} "
+                    f"last_error={snap['last_error']}",
+                    "WARNING" if fail_count < 5 else "ERROR",
+                    "network",
+                )
+                last_net_diag_log = now_diag
+
+            # API mode depends on network for playback and lyrics.
+            if mode == "api":
+                backoff = min(8.0, 0.5 * fail_count)
+                await asyncio.sleep(backoff)
+                continue
+
+            # Local mode keeps running, but reduce loop pressure under instability.
+            if fail_count >= 3:
+                await asyncio.sleep(min(2.5, 0.3 * fail_count))
+        else:
+            if net_latency_ms >= 350.0 and (time.time() - last_net_diag_log) >= 20.0:
+                lat = net.get_latency_stats()
+                log(
+                    f"NETWORK DIAG | degraded latency avg={lat['avg']:.1f}ms "
+                    f"last={lat['last']:.1f}ms max={lat['max']:.1f}ms",
+                    "WARNING",
+                    "network",
+                )
+                last_net_diag_log = time.time()
 
         try:
             tr = await asyncio.to_thread(track_cache.get, get_track_func)
@@ -271,10 +312,17 @@ async def run_presence(
 
             lyrics_task = asyncio.create_task(
                 lyrics_engine(
-                    song, artist, lines, duration_state, url,
-                    rpc, rpc_lock, rpc_error, shutdown_event,
+                    song,
+                    artist,
+                    lines,
+                    duration_state,
+                    url,
+                    rpc,
+                    rpc_lock,
+                    rpc_error,
+                    shutdown_event,
                     get_track_func,
-                    config
+                    config,
                 )
             )
 
@@ -295,7 +343,9 @@ async def run_presence(
         except Exception:
             pass
 
-async def main(config: Dict[str, Any], mode: str = 'api') -> None:
+
+async def main(config: Dict[str, Any], mode: str = "api") -> None:
+    enforce_authorship(config)
     log(f"=== STARTING HIGHWAY TO HELL ENGINE v{__version__} ===", "INFO", "main")
     log(f"Mode: {mode.upper()}", "INFO", "main")
     log(f"Main log: {LOG_FILE}", "INFO", "main")

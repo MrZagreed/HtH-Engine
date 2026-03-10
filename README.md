@@ -87,3 +87,15 @@ Caching backend: SQLite (`lyrics_cache.db`).
 
 ## Current pre-release version
 `0.9.0-pre`
+
+## Authorship and license
+- Official author: `Mr.Zagreed`
+- Runtime attribution notice is automatically enforced in code.
+- Tamper-evident authorship fingerprint is logged at startup.
+- License terms: see `LICENSE`.
+
+## Network drop diagnostics
+- The app now tracks online/degraded/offline network states.
+- During outages, logs include failure count, outage duration, and last network error.
+- API mode applies adaptive backoff under unstable connection.
+- Local mode continues playback tracking with reduced loop pressure.
