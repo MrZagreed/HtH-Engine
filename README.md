@@ -94,18 +94,27 @@ Caching backend: SQLite (`lyrics_cache.db`).
 - Redistribution must include `LICENSE`
 
 ## Author story
-This project started in May 2025, when I was 19 and studying in my third year of college.
-After finishing my internship practice, I felt genuinely inspired to build something of my own.
 
-The first month produced a rough and unstable prototype. It worked, but barely.
-Instead of dropping it, I kept refining it step by step, turning a simple experiment into a serious long-term build.
+This project began in May 2025. I was 19 years old and in my third year of college. After finishing my internship, I felt a strong desire to build something of my own from scratch, not just a class assignment or a short experiment, but a complete tool I could truly finish.
 
-By the time of writing this story, I am 20 and finishing my fourth year.
-Today, Highway to Hell Engine represents that full journey: from a chaotic first idea to a polished release I am proud of.
-I hope it becomes useful to someone else out there.
+This became my first genuinely serious independent project. Before that, I had built smaller programs and experiments, but this was the first time I committed to the full development path: from the initial idea and first lines of code to a stable and polished result.
 
-— Mr.Zagreed
+At the beginning, everything was simple. The first version was a single monolithic file of roughly 300 lines. There was almost no architecture. It worked mostly because the codebase was still small.
 
+Over time, the project started to evolve. As I continued studying in college, I discovered new development approaches and tools, and I gradually brought those lessons into this project. I rewrote parts of the system, split the code into modules, improved the structure, and worked to make the architecture clearer and more resilient.
+
+Development was not always smooth. There were periods when I had to pause because some tasks were too complex for my experience at the time. But I kept returning to the project with better understanding and stronger skills.
+
+Step by step, that simple monolithic script became a full modular project. The process took almost a year and became an important practice for me. It taught me patience, systems thinking, and how to improve code incrementally.
+
+Today, **March 10, 2026**, as I am finishing my fourth year and now 20 years old, I can finally say I brought this project to a state I am truly satisfied with.
+
+For me, **Highway to Hell Engine** is more than just code. It is a journey from a small experiment of a few hundred lines to a complete tool that grew together with my knowledge.
+
+I sincerely hope this application will be useful to someone else.
+
+Mr.Zagreed
+March 10, 2026
 ## Troubleshooting
 1. Fully restart Discord
 2. Restart app
@@ -113,3 +122,4 @@ I hope it becomes useful to someone else out there.
 
 ## Current pre-release version
 `0.9.0-pre`
+
