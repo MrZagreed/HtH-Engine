@@ -10,13 +10,16 @@ from .rpc_client import safe_rpc_update
 from .warp import TimeWarp
 
 BAR_LEN = 14
+MIN_BAR_LEN = 6
 
-def _bar(progress: int, duration: int) -> str:
+
+def _bar(progress: int, duration: int, length: int = BAR_LEN) -> str:
+    length = max(MIN_BAR_LEN, int(length))
     if duration <= 0:
-        return "▱" * BAR_LEN
+        return "▱" * length
     progress = max(0, min(progress, duration))
-    filled = int(BAR_LEN * progress / max(1, duration))
-    return "▰" * filled + "▱" * (BAR_LEN - filled)
+    filled = int(length * progress / max(1, duration))
+    return "▰" * filled + "▱" * (length - filled)
 
 def _fmt_time(ms: int) -> str:
     ms = max(0, int(ms))
@@ -38,22 +41,31 @@ def _safe_spotify_url(url: str) -> Optional[str]:
         return None
 
 
-def _compose_rpc_state(lyrics_state: str, footer: str) -> str:
-    """Compose Discord `state` within 128 chars, preserving footer readability."""
-    footer = (footer or "").strip()
-    if len(footer) >= 128:
-        return footer[:128]
-
-    available = 128 - len(footer) - 1  # newline between lyrics and footer
+def _compose_rpc_state(lyrics_state: str, progress_ms: int, duration_ms: int, suffix: str) -> str:
+    """Keep lyrics block priority (2.5 lines), adapt bar/time footer to fit 128 chars."""
     body = (lyrics_state or "").strip("\n")
+    if len(body) >= 128:
+        return body[:128]
 
-    if available <= 0:
-        return footer[:128]
+    time_full = f"{_fmt_time(progress_ms)} / {_fmt_time(duration_ms)}"
+    time_short = f"{_fmt_time(progress_ms)}"
+    variants = [
+        f"{_bar(progress_ms, duration_ms, BAR_LEN)} {time_full}{suffix}",
+        f"{_bar(progress_ms, duration_ms, 10)} {time_full}{suffix}",
+        f"{_bar(progress_ms, duration_ms, 10)} {time_short}{suffix}",
+        f"{_bar(progress_ms, duration_ms, BAR_LEN)}{suffix}",
+        f"{_bar(progress_ms, duration_ms, 10)}{suffix}",
+        f"{_bar(progress_ms, duration_ms, 8)}{suffix}",
+        f"{_bar(progress_ms, duration_ms, MIN_BAR_LEN)}{suffix}",
+    ]
 
-    if len(body) > available:
-        body = body[: max(1, available - 1)].rstrip() + "…"
+    for footer in variants:
+        candidate = f"{body}\n{footer}" if body else footer
+        if len(candidate) <= 128:
+            return candidate
 
-    return f"{body}\n{footer}"[:128]
+    return body[:128]
+
 async def lyrics_engine(
     song: str,
     artist: str,
@@ -102,15 +114,13 @@ async def lyrics_engine(
         progress_ms = _clamp(progress_ms, 0, max(0, current_duration_ms))
 
         state = display.render(lyrics_data, progress_ms)
-        bar = _bar(progress_ms, current_duration_ms)
-        time_txt = f"{_fmt_time(progress_ms)} / {_fmt_time(current_duration_ms)}"
 
         flip = not flip
         suffix = ZERO_WIDTH if flip else ""
 
         payload: Dict[str, Any] = {
             "details": f"{artist} - {song}"[:128],
-            "state": _compose_rpc_state(state, f"{bar} {time_txt}{suffix}"),
+            "state": _compose_rpc_state(state, progress_ms, current_duration_ms, suffix),
             "instance": True
         }
 
@@ -280,7 +290,4 @@ async def lyrics_engine(
         f"time corrections={warp.total_corrections}",
         "INFO", "engine"
     )
-
-
-
 

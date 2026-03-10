@@ -100,8 +100,16 @@ class SmartLyricsDisplay:
 
         prev_show = prev_chunks[-1] if prev_chunks else ""
         curr_show = curr_chunks[self._page_index] if curr_chunks else ""
-        next_raw = next_chunks[0] if next_chunks else ""
-        next_show = self._next_preview(next_raw)
+
+        # Keep "2.5 lines" always: prefer next chunk of current line,
+        # otherwise show preview of the next lyric line.
+        if self._page_index + 1 < len(curr_chunks):
+            preview_src = curr_chunks[self._page_index + 1]
+        elif next_chunks:
+            preview_src = next_chunks[0]
+        else:
+            preview_src = "…"
+        next_show = self._next_preview(preview_src)
 
         self._cached = self._format_window(prev_show, curr_show, next_show)
         self._last_render_t = now
@@ -109,3 +117,4 @@ class SmartLyricsDisplay:
 
 
 __all__ = ["SmartLyricsDisplay"]
+
