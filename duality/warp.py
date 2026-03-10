@@ -3,10 +3,6 @@ from collections import deque
 from .logging_setup import log
 
 class TimeWarp:
-    """
-    Стабильная оценка смещения между reported (Spotify) и тем, что мы реально показываем.
-    Защита от «разгона вперёд»: большие рассинхроны щёлкаем жёстко, мелкие — сглаживаем.
-    """
     def __init__(self, max_drift_ms: int = 5000, aggressive_correction: bool = True):
         self.max_drift = int(max_drift_ms)
         self.aggressive = aggressive_correction
@@ -42,11 +38,9 @@ class TimeWarp:
             self._maybe_log(now, reported_ms, shown_ms, corrected)
             return self.last_corrected
 
-        # Ошибка между источником и тем, что реально видит пользователь
         error = reported_ms - shown_ms
         abs_err = abs(error)
 
-        # Если ошибка слишком велика, не сглаживаем, а щёлкаем ближе к reported
         if abs_err > 5000:
             self.offset = 0.0
             corrected = reported_ms
@@ -56,12 +50,12 @@ class TimeWarp:
             else:
                 alpha = 0.04
             self.offset = (1.0 - alpha) * self.offset + alpha * error
-            # Ограничим разум
-            if self.offset > self.max_drift:  self.offset = float(self.max_drift)
-            if self.offset < -self.max_drift: self.offset = float(-self.max_drift)
+            if self.offset > self.max_drift:
+                self.offset = float(self.max_drift)
+            if self.offset < -self.max_drift:
+                self.offset = float(-self.max_drift)
             corrected = reported_ms - int(round(self.offset))
 
-        # Никогда не отматываем назад из-за шумов
         if corrected + 5 < self.last_corrected and abs_err < 2500:
             corrected = self.last_corrected + 1
 
@@ -75,11 +69,12 @@ class TimeWarp:
     def _maybe_log(self, now: float, reported_ms: int, shown_ms: int, corrected_ms: int, error: int | None = None):
         if error is None:
             error = reported_ms - shown_ms
-        log_every = 5.0
-        if (now - self.last_log_time) >= log_every or self.total_corrections % 50 == 0 or abs(error) > 3000:
+        # Логируем реже: раз в 30 секунд или каждые 100 коррекций
+        log_every = 30.0
+        if (now - self.last_log_time) >= log_every or self.total_corrections % 100 == 0 or abs(error) > 5000:
             avg = sum(self.drift_history)/len(self.drift_history) if self.drift_history else 0.0
             log(
-                f"СИНХРОНИЗАЦИЯ: reported={reported_ms}ms, current={shown_ms}ms, "
+                f"СИНХРОНИЗАЦИЯ: reported={reported_ms}ms, shown={shown_ms}ms, "
                 f"drift={error}ms, corrected={corrected_ms}ms, "
                 f"avg_drift={avg:.1f}ms, corrections={self.total_corrections}",
                 "INFO", "warp"

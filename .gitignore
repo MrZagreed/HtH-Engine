@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+duality_venv/
+.venv/
+venv/
+
+# Logs
+logs/
+*.log
+
+# Local data
+.duality_cache/
+.spotify_cache
+.spotify_cache*
+duality_data/config/duality_config.json
+duality_data/cache/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Codex local metadata
+.codex/
