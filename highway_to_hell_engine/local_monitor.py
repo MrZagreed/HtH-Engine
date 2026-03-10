@@ -21,6 +21,26 @@ try:
 except Exception:
     GlobalSystemMediaTransportControlsSessionManager = None
 
+WINDOWS_EPOCH_TICKS = 116444736000000000  # 1601-01-01 -> 1970-01-01 (100ns ticks)
+
+
+def _winrt_datetime_to_unix_ms(value: Any) -> Optional[int]:
+    """Convert WinRT DateTime to unix milliseconds, if possible."""
+    if value is None:
+        return None
+
+    try:
+        if hasattr(value, "timestamp"):
+            return int(value.timestamp() * 1000)
+    except Exception:
+        pass
+
+    try:
+        ticks = int(getattr(value, "universal_time"))
+        return int((ticks - WINDOWS_EPOCH_TICKS) / 10000)
+    except Exception:
+        return None
+
 
 def _get_windows_track_fast() -> Optional[Tuple[str, str]]:
     """Fallback: read track from Spotify window title."""
@@ -116,6 +136,19 @@ async def _read_media_session_async() -> Optional[Dict[str, Any]]:
     progress_ms = int(timeline.position.total_seconds() * 1000)
     duration_ms = int(timeline.end_time.total_seconds() * 1000)
 
+    # WinRT timeline position can be stale; extrapolate to reduce local RPC lag.
+    try:
+        last_updated_ms = _winrt_datetime_to_unix_ms(getattr(timeline, "last_updated_time", None))
+        if last_updated_ms is not None:
+            now_ms = int(time.time() * 1000)
+            delta_ms = now_ms - last_updated_ms
+            if delta_ms > 0:
+                progress_ms += min(delta_ms, 15000)
+    except Exception:
+        pass
+
+    if duration_ms > 0 and progress_ms > duration_ms:
+        progress_ms = duration_ms
     return {
         "track": track,
         "artist": artist,
@@ -211,3 +244,4 @@ class LocalSpotifyMonitor:
             "progress_ms": int(state["progress_ms"]),
             "timestamp": int(time.time() * 1000),
         }
+
