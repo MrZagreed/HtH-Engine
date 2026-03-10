@@ -11,13 +11,13 @@ class NetworkMonitor:
         self.latency_history = []
         
     def check(self, host="8.8.8.8", port=53, timeout=0.7) -> bool:
-        """Основной метод проверки сети (совместимый с текущим кодом)"""
+        """Main network check method (legacy-compatible)"""
         self.total_checks += 1
         try:
             sock = socket.create_connection((host, port), timeout=timeout)
             sock.close()
             if self.consecutive_failures:
-                log(f"СЕТЬ | восстановлена после {self.consecutive_failures} сбоев", "INFO", "network")
+                log(f"NETWORK | restored after {self.consecutive_failures} failures", "INFO", "network")
             self.consecutive_failures = 0
             self.last_net_ok = time.time()
             return True
@@ -25,11 +25,11 @@ class NetworkMonitor:
             self.consecutive_failures += 1
             self.total_failures += 1
             lvl = "WARNING" if self.consecutive_failures < 5 else "ERROR"
-            log(f"СЕТЬ | сбой #{self.consecutive_failures}: {e}", lvl, "network")
+            log(f"NETWORK | failure #{self.consecutive_failures}: {e}", lvl, "network")
             return False
 
     def check_with_latency(self, host="8.8.8.8", port=53, timeout=1.0) -> tuple:
-        """Расширенная проверка с измерением задержки"""
+        """Extended check with latency measurement"""
         self.total_checks += 1
         start_time = time.time()
         try:
@@ -38,7 +38,7 @@ class NetworkMonitor:
             latency = (time.time() - start_time) * 1000
             
             if self.consecutive_failures:
-                log(f"СЕТЬ | восстановлена после {self.consecutive_failures} сбоев, latency={latency:.1f}ms", "INFO", "network")
+                log(f"NETWORK | restored after {self.consecutive_failures} failures, latency={latency:.1f}ms", "INFO", "network")
             
             self.consecutive_failures = 0
             self.last_net_ok = time.time()
@@ -53,7 +53,7 @@ class NetworkMonitor:
             latency = -1
             
             lvl = "WARNING" if self.consecutive_failures < 5 else "ERROR"
-            log(f"СЕТЬ | сбой #{self.consecutive_failures}: {e}", lvl, "network")
+            log(f"NETWORK | failure #{self.consecutive_failures}: {e}", lvl, "network")
             return False, latency
 
     def stats(self) -> Dict[str, Any]:

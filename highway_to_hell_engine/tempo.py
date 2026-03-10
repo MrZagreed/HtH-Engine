@@ -14,12 +14,12 @@ class BlastBeatDetector:
 class TempoSynchronizer:
     def __init__(self):
         self.blast = BlastBeatDetector()
-        # Расширенный список метал-групп
+        # Extended metal artists list
         self.metal_artists = {"slipknot", "metallica", "megadeth", "anthrax", "pantera",
                               "lamb of god", "gojira", "meshuggah", "opeth"}
 
     def _syllables(self, text: str) -> int:
-        v = "аеёиоуыэюяaeiouy"
+        v = "aeiouy"
         cnt = 0
         in_v = False
         for ch in text.lower():
@@ -42,11 +42,11 @@ class TempoSynchronizer:
             s = self._syllables(ln)
             t += int(per * (1.0 + min(0.5, s/12.0)))
 
-        # Компенсация для метал-групп
+        # Compensation for metal artists
         if artist.lower() in self.metal_artists:
             out = [(max(0, t-50), l) for t, l in out]
 
-        # Бласт-секции
+        # Blast sections
         for s, e in self.blast.detect(out):
             out = [(t-40 if s <= t <= e else t, l) for t, l in out]
 

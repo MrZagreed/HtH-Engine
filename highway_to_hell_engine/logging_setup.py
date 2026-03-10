@@ -24,13 +24,13 @@ else:
 LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
-_LOG_RE = re.compile(r"^(debug|duality)_(\d{8}_\d{6})\.log$")
+_LOG_RE = re.compile(r"^(debug|highway_to_hell_engine)_(\d{8}_\d{6})\.log$")
 
 
 def cleanup_old_logs(max_sessions: int = 5) -> None:
     """
-    Хранит только последние `max_sessions` запусков.
-    Один запуск = 2 файла (debug_* и duality_*).
+    Keeps only the latest `max_sessions` runs.
+    One run = 2 files (debug_* and highway_to_hell_engine_*).
     """
     try:
         log_files = list(LOG_DIR.glob("*.log"))
@@ -52,7 +52,7 @@ def cleanup_old_logs(max_sessions: int = 5) -> None:
             if ts not in keep_ts:
                 to_delete.extend(files)
 
-        # Для нестандартных логов оставляем только последние 10.
+        # Keep only last 10 nonstandard log files.
         extra_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         to_delete.extend(extra_files[10:])
 
@@ -60,23 +60,23 @@ def cleanup_old_logs(max_sessions: int = 5) -> None:
             try:
                 old.unlink(missing_ok=True)
             except Exception:
-                # Если файл занят другим процессом, не останавливаем очистку.
+                # If file is locked by another process, continue cleanup.
                 continue
     except Exception:
-        # Очистка логов не должна ронять приложение.
+        # Log cleanup must never crash the app.
         pass
 
 
 cleanup_old_logs(5)
 
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-LOG_FILE = LOG_DIR / f"duality_{timestamp}.log"
+LOG_FILE = LOG_DIR / f"highway_to_hell_engine_{timestamp}.log"
 DEBUG_LOG_FILE = LOG_DIR / f"debug_{timestamp}.log"
 
 
 class AdvancedLogger:
     def __init__(self, level: str = "INFO"):
-        self.logger = logging.getLogger("duality")
+        self.logger = logging.getLogger("highway_to_hell_engine")
         self.logger.setLevel(logging.DEBUG)
 
         fmt = logging.Formatter("%(asctime)s | %(levelname)-8s | %(message)s", datefmt="%H:%M:%S")
@@ -113,13 +113,13 @@ class AdvancedLogger:
         self.logger.addHandler(ch)
 
         if _missing_colorama:
-            self.log("WARNING", "colorama не установлен — цвета в консоли отключены.", "logging")
+            self.log("WARNING", "colorama is not installed - console colors disabled.", "logging")
 
     def log(self, level: str, msg: str, component: str = "main"):
         getattr(self.logger, level.lower())(msg)
 
 
-LOGGER = AdvancedLogger(level=os.environ.get("DUALITY_LOG_LEVEL", "INFO"))
+LOGGER = AdvancedLogger(level=os.environ.get("HIGHWAY_TO_HELL_ENGINE_LOG_LEVEL", "INFO"))
 
 
 def log(msg: str, level: str = "INFO", component: str = "main"):

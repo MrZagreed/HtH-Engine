@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Bootstrap: выбирает совместимый Python, создаёт venv, ставит зависимости
-и перезапускает run.py внутри виртуального окружения.
+Bootstrap: selects a compatible Python, creates venv, installs dependencies,
+and re-executes run.py inside the virtual environment.
 
-Предпочтение версий:
+Preferred versions:
 - Python 3.12
 - Python 3.11
 - Python 3.10
 
-Если подходящая версия через launcher `py` не найдена, используется текущий
-интерпретатор только если он совместим по версии.
+If no compatible version is found via `py` launcher, the current
+interpreter is used only when version-compatible.
 """
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ import subprocess
 from pathlib import Path
 from typing import Iterable, Optional
 
-VENVDIR_NAME = "duality_venv"
-REENTER_FLAG = "--__duality__"
+VENVDIR_NAME = "highway_to_hell_engine_venv"
+REENTER_FLAG = "--__highway_to_hell_engine__"
 REQUIREMENTS_FILE = "requirements.txt"
 PREFERRED_MINOR_VERSIONS = (12, 11, 10)
 MIN_SUPPORTED = (3, 10)
@@ -69,12 +69,12 @@ def is_preferred(version: tuple[int, int, int]) -> bool:
 
 def describe_version_choice(version: tuple[int, int, int]) -> str:
     if is_preferred(version):
-        return "предпочтительная"
+        return "preferred"
     if is_supported(version):
         if version[0] == MAX_TESTED_MAJOR and version[1] > MAX_TESTED_MINOR:
-            return "совместимая, но не проверенная"
-        return "совместимая"
-    return "несовместимая"
+            return "compatible but untested"
+        return "compatible"
+    return "incompatible"
 
 
 def run_capture(cmd: list[str], timeout: int = 10) -> Optional[str]:
@@ -129,7 +129,7 @@ def detect_best_python() -> tuple[list[str], tuple[int, int, int], str]:
     current_cmd = [sys.executable]
     current_version = get_python_version(current_cmd)
     if current_version:
-        candidates.append((current_version, current_cmd, "текущий интерпретатор"))
+        candidates.append((current_version, current_cmd, "current interpreter"))
 
     preferred = [item for item in candidates if is_preferred(item[0])]
     if preferred:
@@ -144,10 +144,10 @@ def detect_best_python() -> tuple[list[str], tuple[int, int, int], str]:
     details = ", ".join(
         f"{source}: {format_version(version)} ({describe_version_choice(version)})"
         for version, _, source in candidates
-    ) or "ничего не найдено"
+    ) or "nothing found"
     raise RuntimeError(
-        "Не найден совместимый Python. Нужен Python 3.10–3.12, лучше 3.12. "
-        f"Обнаружено: {details}"
+        "No compatible Python found. Requires Python 3.10-3.12 (3.12 recommended). "
+        f"Detected: {details}"
     )
 
 
@@ -174,12 +174,12 @@ def create_venv(venv_dir: Path, python_cmd: list[str]) -> None:
         if result.returncode == 0:
             return
 
-        print("Ошибка создания venv:", file=sys.stderr)
-        print(result.stderr.strip() or result.stdout.strip() or "[нет вывода]", file=sys.stderr)
+        print("Failed to create venv:", file=sys.stderr)
+        print(result.stderr.strip() or result.stdout.strip() or "[no output]", file=sys.stderr)
     except FileNotFoundError:
-        print("Не удалось запустить выбранный интерпретатор для создания venv.", file=sys.stderr)
+        print("Failed to launch selected interpreter to create venv.", file=sys.stderr)
     except subprocess.TimeoutExpired:
-        print("Создание venv превысило лимит времени.", file=sys.stderr)
+        print("Venv creation timed out.", file=sys.stderr)
 
     if os.name == "nt":
         cmd_str = subprocess.list2cmdline(cmd_list)
@@ -196,15 +196,15 @@ def create_venv(venv_dir: Path, python_cmd: list[str]) -> None:
         if result.returncode == 0:
             return
 
-        print("Критическая ошибка создания venv (fallback через shell):", file=sys.stderr)
-        print(result.stderr.strip() or result.stdout.strip() or "[нет вывода]", file=sys.stderr)
+        print("Critical venv creation failure (shell fallback):", file=sys.stderr)
+        print(result.stderr.strip() or result.stdout.strip() or "[no output]", file=sys.stderr)
 
     raise SystemExit(1)
 
 
 def install_swspotify_compat(venv_python: Path) -> None:
-    """Устанавливает SwSpotify на Windows + Python 3.12+, обходя старый пин pywin32."""
-    print("Установка совместимого набора для локального режима (SwSpotify)...")
+    """Installs SwSpotify on Windows + Python 3.12+ by bypassing old pywin32 pin."""
+    print("Installing compatible package set for local mode (SwSpotify)...")
     subprocess.check_call([
         str(venv_python), "-m", "pip", "install",
         "--require-virtualenv",
@@ -229,7 +229,7 @@ def pip_install_requirements(venv_dir: Path, req_file: Path) -> None:
     ])
 
     if req_file.is_file():
-        print(f"Установка зависимостей из {req_file.name} ...")
+        print(f"Installing dependencies from {req_file.name} ...")
         subprocess.check_call([
             str(venv_python), "-m", "pip", "install",
             "--require-virtualenv",
@@ -240,7 +240,7 @@ def pip_install_requirements(venv_dir: Path, req_file: Path) -> None:
         if os.name == "nt" and venv_version and venv_version >= (3, 12, 0):
             install_swspotify_compat(venv_python)
     else:
-        print(f"Файл {req_file.name} не найден, установка зависимостей пропущена.")
+        print(f"File {req_file.name} not found, dependency install skipped.")
 
 
 def is_running_inside_target_venv(venv_dir: Path) -> bool:
@@ -271,20 +271,20 @@ def ensure_env_and_reexec() -> None:
         return
 
     if not script.is_file():
-        raise FileNotFoundError(f"Не найден файл запуска: {script}")
+        raise FileNotFoundError(f"Startup file not found: {script}")
 
-    print("[bootstrap] Настройка изолированного окружения...", flush=True)
+    print("[bootstrap] Setting up isolated environment...", flush=True)
 
     python_cmd, version, source = detect_best_python()
     print(
-        f"Выбран интерпретатор: {source} | Python {format_version(version)} "
+        f"Selected interpreter: {source} | Python {format_version(version)} "
         f"({describe_version_choice(version)})"
     )
 
     if version[0] == MAX_TESTED_MAJOR and version[1] > MAX_TESTED_MINOR:
         print(
-            "Предупреждение: используется версия новее проверенной. "
-            "Для этого проекта предпочтителен Python 3.12.",
+            "Warning: using a newer-than-tested version. "
+            "Python 3.12 is recommended for this project.",
             file=sys.stderr,
         )
 
@@ -292,37 +292,37 @@ def ensure_env_and_reexec() -> None:
     if venv_dir.exists():
         venv_version = get_venv_python_version(venv_dir)
         if venv_version is None:
-            print("Существующий venv поврежден или неполон, будет пересоздан.")
+            print("Existing venv is broken or incomplete and will be recreated.")
             rebuild_venv = True
         elif (venv_version[0], venv_version[1]) != (version[0], version[1]):
             print(
-                "Существующий venv использует другую версию Python: "
-                f"{format_version(venv_version)}. Требуется {format_version(version)}."
+                "Existing venv uses different Python version: "
+                f"{format_version(venv_version)}. Required {format_version(version)}."
             )
             rebuild_venv = True
         elif not is_supported(venv_version):
             print(
-                "Существующий venv использует неподдерживаемую версию Python: "
+                "Existing venv uses unsupported Python version: "
                 f"{format_version(venv_version)}."
             )
             rebuild_venv = True
 
     if not venv_dir.exists() or rebuild_venv:
-        print(f"Создаем venv: {venv_dir}")
+        print(f"Creating venv: {venv_dir}")
         create_venv(venv_dir, python_cmd)
     else:
-        print(f"Используем существующий venv: {venv_dir}")
-    print("Устанавливаем пакеты...")
+        print(f"Using existing venv: {venv_dir}")
+    print("Installing packages...")
     pip_install_requirements(venv_dir, req_path)
 
     venv_python, _ = venv_paths(venv_dir)
     new_argv = [str(venv_python), str(script), REENTER_FLAG, *sys.argv[1:]]
 
-    print(f"[bootstrap] Перезапуск в venv: {venv_python}\n")
+    print(f"[bootstrap] Re-executing in venv: {venv_python}\n")
 
     if os.name == "nt":
-        # На Windows используем execv, чтобы не плодить detached-процессы.
-        # Это снижает риск множества фоновых копий и блокировки старых логов.
+        # On Windows, use execv to avoid spawning detached processes.
+        # This reduces the risk of background duplicates and log file locks.
         try:
             os.execv(str(venv_python), new_argv)
         except Exception:
@@ -338,10 +338,10 @@ if __name__ == "__main__":
     try:
         ensure_env_and_reexec()
     except KeyboardInterrupt:
-        print("\nПрервано", file=sys.stderr)
+        print("\nInterrupted", file=sys.stderr)
         raise SystemExit(130)
     except Exception as exc:
-        print(f"Ошибка bootstrap:\n{type(exc).__name__}: {exc}", file=sys.stderr)
+        print(f"Bootstrap error:\n{type(exc).__name__}: {exc}", file=sys.stderr)
         raise SystemExit(1)
 
 

@@ -7,11 +7,11 @@ from .logging_setup import log
 
 RPC_TIMEOUT_S = 5.0
 MAX_CONSECUTIVE_FAILURES = 8
-RECONNECT_DELAYS = [1.0, 2.0, 5.0, 10.0, 30.0]  # Прогрессивные задержки переподключения
+RECONNECT_DELAYS = [1.0, 2.0, 5.0, 10.0, 30.0]  # Progressive reconnect delays
 
 class RPCClient:
     """
-    Улучшенный RPC клиент с автоматическим восстановлением и детальным мониторингом
+    Enhanced RPC client with auto-recovery and detailed monitoring
     """
     def __init__(self, client_id: str):
         self.client_id = client_id
@@ -37,7 +37,7 @@ class RPCClient:
         }
 
     async def connect(self, max_retries: int = 5) -> bool:
-        """Подключение к Discord RPC с повторными попытками"""
+        """Connect to Discord RPC with retries"""
         if self.connected:
             return True
 
@@ -46,57 +46,57 @@ class RPCClient:
             self.last_connection_attempt = time.time()
             
             try:
-                log(f"Попытка подключения к Discord RPC ({attempt + 1}/{max_retries})...", "INFO", "rpc")
+                log(f"Attempting Discord RPC connection ({attempt + 1}/{max_retries})...", "INFO", "rpc")
                 await asyncio.wait_for(self.rpc.connect(), timeout=10.0)
                 self.connected = True
                 self.stats['reconnects'] += 1
-                log("✓ Успешное подключение к Discord RPC", "INFO", "rpc")
+                log("Discord RPC connected successfully", "INFO", "rpc")
                 return True
                 
             except asyncio.TimeoutError:
-                log(f"Таймаут подключения к Discord (попытка {attempt + 1})", "WARNING", "rpc")
+                log(f"Discord connection timeout (attempt {attempt + 1})", "WARNING", "rpc")
             except DiscordNotFound:
-                log("Discord не запущен или не найден", "ERROR", "rpc")
+                log("Discord is not running or not found", "ERROR", "rpc")
                 if attempt == max_retries - 1:
                     return False
             except InvalidID:
-                log("Неверный Client ID Discord", "ERROR", "rpc")
+                log("Invalid Discord Client ID", "ERROR", "rpc")
                 return False
             except Exception as e:
-                log(f"Ошибка подключения к Discord: {e} (попытка {attempt + 1})", "ERROR", "rpc")
+                log(f"Discord connection error: {e} (attempt {attempt + 1})", "ERROR", "rpc")
                 self.stats['last_error'] = str(e)
 
-            # Прогрессивная задержка между попытками
+            # Progressive delay between attempts
             delay = RECONNECT_DELAYS[min(attempt, len(RECONNECT_DELAYS) - 1)]
-            log(f"Повторная попытка через {delay} секунд...", "DEBUG", "rpc")
+            log(f"Retrying in {delay} seconds...", "DEBUG", "rpc")
             await asyncio.sleep(delay)
 
-        log("Не удалось подключиться к Discord после всех попыток", "ERROR", "rpc")
+        log("Failed to connect to Discord after all retries", "ERROR", "rpc")
         return False
 
     async def safe_update(self, payload: Dict[str, Any]) -> bool:
         """
-        Безопасное обновление RPC с обработкой ошибок и автоматическим восстановлением
-        Возвращает True при успешном обновлении
+        Safe RPC update with error handling and auto-recovery
+        Returns True on successful update
         """
         start_time = time.time()
         
-        # Проверяем не приостановлены ли обновления
+        # Check if updates are suspended
         if self.error_state.get("suspended", False):
             suspend_time = time.time() - self.error_state.get("suspend_time", 0)
-            if suspend_time < 30:  # 30 секунд приостановки
-                if int(suspend_time) % 10 == 0:  # Логируем каждые 10 секунд
-                    log(f"RPC приостановлен, осталось {30 - int(suspend_time)}с", "WARNING", "rpc")
+            if suspend_time < 30:  # 30-second suspension window
+                if int(suspend_time) % 10 == 0:  # Log every 10 seconds
+                    log(f"RPC suspended, remaining {30 - int(suspend_time)}s", "WARNING", "rpc")
                 return False
             else:
-                # Пробуем восстановить работу
+                # Attempt automatic recovery
                 self.error_state["suspended"] = False
                 self.error_state["fails"] = 0
-                log("Автоматическое восстановление RPC после приостановки", "INFO", "rpc")
+                log("RPC auto-recovered after suspension", "INFO", "rpc")
 
-        # Проверяем подключение
+        # Check connection state
         if not self.connected:
-            log("RPC не подключен, попытка переподключения...", "WARNING", "rpc")
+            log("RPC not connected, trying reconnect...", "WARNING", "rpc")
             if not await self.connect():
                 return False
 
@@ -106,47 +106,47 @@ class RPCClient:
                 await asyncio.wait_for(self.rpc.update(**payload), timeout=RPC_TIMEOUT_S)
                 update_time = time.time() - update_start
 
-            # Успешное обновление
+            # Successful update
             self.error_state["fails"] = 0
             self.error_state["suspended"] = False
             self.stats['last_success'] = time.time()
             self.stats['updates_sent'] += 1
             
-            # Обновляем среднее время обновления
+            # Update average update time
             total_time = self.stats['average_update_time'] * (self.stats['updates_sent'] - 1)
             self.stats['average_update_time'] = (total_time + update_time) / self.stats['updates_sent']
             
-            # Логируем медленные обновления
+            # Log slow updates
             if update_time > 1.0:
-                log(f"Медленное обновление RPC: {update_time:.2f}с", "DEBUG", "rpc")
+                log(f"Slow RPC update: {update_time:.2f}s", "DEBUG", "rpc")
                 
-            # Периодическая статистика
+            # Periodic stats
             if self.stats['updates_sent'] % 50 == 0:
                 self._log_statistics()
                 
             return True
 
         except asyncio.TimeoutError:
-            self._handle_error("Таймаут обновления RPC")
+            self._handle_error("RPC update timeout")
             return False
             
         except ConnectionResetError:
-            self._handle_error("Сброс соединения RPC")
+            self._handle_error("RPC connection reset")
             await self._attempt_reconnect()
             return False
             
         except BrokenPipeError:
-            self._handle_error("Обрыв канала RPC")
+            self._handle_error("RPC pipe broken")
             await self._attempt_reconnect()
             return False
             
         except DiscordNotFound:
-            self._handle_error("Discord не найден")
+            self._handle_error("Discord not found")
             self.connected = False
             return False
             
         except Exception as e:
-            self._handle_error(f"Неизвестная ошибка RPC: {e}")
+            self._handle_error(f"Unknown RPC error: {e}")
             log(traceback.format_exc(), "DEBUG", "rpc")
             await self._attempt_reconnect()
             return False
@@ -154,67 +154,67 @@ class RPCClient:
         finally:
             total_time = time.time() - start_time
             if total_time > 2.0:
-                log(f"Долгое обновление RPC: {total_time:.2f}с", "WARNING", "rpc")
+                log(f"Long RPC update: {total_time:.2f}s", "WARNING", "rpc")
 
     def _handle_error(self, error_msg: str):
-        """Обработка ошибки RPC"""
+        """RPC error handler"""
         self.error_state["fails"] += 1
         self.error_state["last_error"] = error_msg
         self.error_state["last_error_time"] = time.time()
         self.stats['updates_failed'] += 1
         
-        log(f"Ошибка RPC #{self.error_state['fails']}: {error_msg}", 
+        log(f"RPC error #{self.error_state['fails']}: {error_msg}", 
             "ERROR" if self.error_state["fails"] > 3 else "WARNING", "rpc")
 
-        # Приостанавливаем обновления после множества ошибок
+        # Suspend updates after too many errors
         if self.error_state["fails"] >= MAX_CONSECUTIVE_FAILURES and not self.error_state["suspended"]:
             self.error_state["suspended"] = True
             self.error_state["suspend_time"] = time.time()
-            log(f"ПРИОСТАНОВКА RPC: слишком много ошибок ({self.error_state['fails']})", "ERROR", "rpc")
+            log(f"RPC SUSPENDED: too many errors ({self.error_state['fails']})", "ERROR", "rpc")
 
     async def _attempt_reconnect(self):
-        """Попытка переподключения к RPC"""
-        log("Попытка переподключения к RPC...", "INFO", "rpc")
+        """Attempting RPC reconnect"""
+        log("Attempting RPC reconnect...", "INFO", "rpc")
         try:
             await self.rpc.close()
             self.connected = False
             await asyncio.sleep(1.0)
             await self.connect()
         except Exception as e:
-            log(f"Ошибка переподключения RPC: {e}", "ERROR", "rpc")
+            log(f"RPC reconnect error: {e}", "ERROR", "rpc")
 
     async def clear_presence(self):
-        """Очистка RPC присутствия"""
+        """Clear RPC presence"""
         try:
             async with self.rpc_lock:
                 await self.rpc.clear()
-            log("RPC присутствие очищено", "INFO", "rpc")
+            log("RPC presence cleared", "INFO", "rpc")
         except Exception as e:
-            log(f"Ошибка очистки RPC: {e}", "ERROR", "rpc")
+            log(f"RPC clear error: {e}", "ERROR", "rpc")
 
     async def close(self):
-        """Закрытие RPC соединения"""
+        """Close RPC connection"""
         try:
             await self.clear_presence()
             await self.rpc.close()
             self.connected = False
-            log("RPC соединение закрыто", "INFO", "rpc")
+            log("RPC connection closed", "INFO", "rpc")
         except Exception as e:
-            log(f"Ошибка закрытия RPC: {e}", "ERROR", "rpc")
+            log(f"RPC close error: {e}", "ERROR", "rpc")
 
     def _log_statistics(self):
-        """Логирование статистики RPC"""
+        """RPC stats logging"""
         success_rate = (self.stats['updates_sent'] / 
                        max(1, self.stats['updates_sent'] + self.stats['updates_failed'])) * 100
         
-        log(f"СТАТИСТИКА RPC: отправлено={self.stats['updates_sent']}, "
-            f"ошибок={self.stats['updates_failed']}, "
-            f"успех={success_rate:.1f}%, "
-            f"среднее_время={self.stats['average_update_time']:.3f}с, "
-            f"переподключений={self.stats['reconnects']}", "INFO", "rpc")
+        log(f"RPC STATS: sent={self.stats['updates_sent']}, "
+            f"failed={self.stats['updates_failed']}, "
+            f"success={success_rate:.1f}%, "
+            f"avg_time={self.stats['average_update_time']:.3f}s, "
+            f"reconnects={self.stats['reconnects']}", "INFO", "rpc")
 
     def get_status(self) -> Dict[str, Any]:
-        """Получение текущего статуса RPC клиента"""
+        """Get current RPC client status"""
         return {
             'connected': self.connected,
             'connection_attempts': self.connection_attempts,
@@ -226,13 +226,13 @@ class RPCClient:
         }
 
 
-# Совместимость со старым кодом
+# Legacy compatibility
 async def safe_rpc_update(rpc: AioPresence, payload: Dict[str, Any], rpc_lock: asyncio.Lock, error_state: Dict[str, Any]) -> bool:
     """
-    Совместимая функция для старого кода
-    Возвращает True если обновление успешно
+    Legacy-compatible function
+    Returns True if update succeeded
     """
-    # Создаем временный клиент для совместимости
+    # Create temporary compatibility client
     temp_client = RPCClient("temp")
     temp_client.rpc = rpc
     temp_client.connected = True
@@ -243,13 +243,13 @@ async def safe_rpc_update(rpc: AioPresence, payload: Dict[str, Any], rpc_lock: a
 
 
 async def emergency_clear_rpc(rpc: AioPresence):
-    """Аварийная очистка RPC"""
+    """Emergency RPC cleanup"""
     try:
         await rpc.clear()
         await rpc.close()
-        log("Аварийная очистка RPC выполнена", "INFO", "rpc")
+        log("Emergency RPC cleanup completed", "INFO", "rpc")
     except Exception as e:
-        log(f"Аварийная очистка RPC не удалась: {e}", "ERROR", "rpc")
+        log(f"Emergency RPC cleanup failed: {e}", "ERROR", "rpc")
 
 
 __all__ = ["RPCClient", "safe_rpc_update", "emergency_clear_rpc"]

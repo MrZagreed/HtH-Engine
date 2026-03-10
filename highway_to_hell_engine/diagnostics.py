@@ -10,7 +10,7 @@ try:
     import psutil
 except ImportError:
     psutil = None
-    log("psutil не установлен — функции диагностики ограничены.", "WARNING", "diagnostics")
+    log("psutil is not installed - diagnostics features are limited.", "WARNING", "diagnostics")
 
 def env_report() -> Dict[str, Any]:
     return {
@@ -39,32 +39,32 @@ def write_report(path: Path):
 
 def is_spotify_ad(current: dict) -> bool:
     """
-    Улучшенное определение рекламы.
+    Improved advertisement detection.
     """
     if not current:
         return False
 
-    # Явный тип
+    # Explicit type check
     if current.get("currently_playing_type") == "ad":
         return True
 
     item = current.get("item")
-    # Если нет item — скорее всего реклама (или ошибка)
+    # Missing item usually means advertisement (or API anomaly)
     if not item:
         return True
 
-    # Эвристики по названию и исполнителю
+    # Name/artist heuristics
     name = (item.get("name") or "").lower()
     artists = item.get("artists") or [{}]
     artist_name = (artists[0].get("name") or "").lower()
 
-    # Список триггерных слов
-    ad_keywords = ["advert", "advertisement", "spotify", "реклама"]
+    # Trigger keywords
+    ad_keywords = ["advert", "advertisement", "spotify", "ad"]
     for kw in ad_keywords:
         if kw in name or kw in artist_name:
             return True
 
-    # Короткие треки (< 30 сек) часто реклама
+    # Very short tracks (< 30s) are often ads
     duration = item.get("duration_ms") or 0
     if 0 < duration < 30000:
         return True

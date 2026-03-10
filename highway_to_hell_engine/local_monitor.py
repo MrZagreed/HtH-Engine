@@ -23,7 +23,7 @@ except Exception:
 
 
 def _get_windows_track_fast() -> Optional[Tuple[str, str]]:
-    """Fallback: чтение трека из заголовка окна Spotify."""
+    """Fallback: read track from Spotify window title."""
     if win32gui is None or win32process is None:
         return None
 
@@ -131,15 +131,15 @@ def _read_media_session_sync() -> Optional[Dict[str, Any]]:
     try:
         return asyncio.run(_read_media_session_async())
     except RuntimeError:
-        # На всякий случай fallback, если где-то уже есть loop в этом потоке.
+        # Fallback if an event loop is already running in this thread.
         return None
     except Exception as e:
-        log(f"Ошибка media session: {e}", "DEBUG", "local")
+        log(f"Media session error: {e}", "DEBUG", "local")
         return None
 
 
 class LocalSpotifyMonitor:
-    """Мониторинг локального Spotify клиента (без Premium)."""
+    """Local Spotify client monitor (no Premium required)."""
 
     def __init__(self, default_duration_ms: int = 300000):
         self._last_track_key: Optional[str] = None

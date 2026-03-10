@@ -7,7 +7,7 @@ from typing import Any, Dict
 
 from .app_paths import CONFIG_FILE, ensure_app_dirs
 
-LEGACY_CONFIG_FILE = Path(__file__).resolve().parent.parent / "duality_config.json"
+LEGACY_CONFIG_FILE = Path(__file__).resolve().parent.parent / "highway_to_hell_engine_config.json"
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "discord_hover_text": "Discord Karaoke RPC by Mr.Zagreed",
@@ -53,7 +53,7 @@ def _migrate_legacy_config_if_needed() -> None:
     ensure_app_dirs()
     try:
         CONFIG_FILE.write_text(LEGACY_CONFIG_FILE.read_text(encoding="utf-8"), encoding="utf-8")
-        print(f"Конфиг перемещен: {LEGACY_CONFIG_FILE.name} -> {CONFIG_FILE}")
+        print(f"Config migrated: {LEGACY_CONFIG_FILE.name} -> {CONFIG_FILE}")
     except Exception:
         pass
 
@@ -67,14 +67,14 @@ def _prompt_config(mode: str, existing: Dict[str, Any] | None = None) -> Dict[st
     cfg = dict(existing)
 
     print("=" * 56)
-    print("МАСТЕР ПЕРВОЙ НАСТРОЙКИ")
+    print("FIRST-RUN SETUP WIZARD")
     print("=" * 56)
-    print(f"Режим: {mode.upper()}")
+    print(f"Mode: {mode.upper()}")
 
     discord_hint = f" [{cfg.get('discord_client_id')}]" if cfg.get("discord_client_id") else ""
     discord_id = input(f"Discord Client ID{discord_hint}: ").strip() or str(cfg.get("discord_client_id", "")).strip()
     if not _is_valid_discord_id(discord_id):
-        print("Ошибка: Discord Client ID должен содержать 18-19 цифр.")
+        print("Error: Discord Client ID must contain 18-19 digits.")
         sys.exit(1)
     cfg["discord_client_id"] = discord_id
 
@@ -86,13 +86,13 @@ def _prompt_config(mode: str, existing: Dict[str, Any] | None = None) -> Dict[st
         spotify_secret = input(f"Spotify Secret{sp_secret_hint}: ").strip() or str(cfg.get("spotify_secret", "")).strip()
 
         if not spotify_client_id or not spotify_secret:
-            print("Ошибка: для API-режима нужны Spotify Client ID и Spotify Secret.")
+            print("Error: API mode requires Spotify Client ID and Spotify Secret.")
             sys.exit(1)
 
         cfg["spotify_client_id"] = spotify_client_id
         cfg["spotify_secret"] = spotify_secret
     else:
-        # Для local Spotify API креды не обязательны.
+        # Spotify API credentials are optional in local mode.
         cfg.setdefault("spotify_client_id", "")
         cfg.setdefault("spotify_secret", "")
 
@@ -108,8 +108,8 @@ def _validate_for_mode(cfg: Dict[str, Any], mode: str) -> bool:
 
 def load_or_create_config(mode: str = "api") -> Dict[str, Any]:
     """
-    Загружает конфигурацию из файла/переменных окружения.
-    Если данных недостаточно для выбранного режима — запускает мастер настройки.
+    Loads configuration from file/environment variables.
+    If data is insufficient for selected mode, starts setup wizard.
     """
     mode = (mode or "api").lower().strip()
     if mode not in {"api", "local"}:
@@ -129,15 +129,15 @@ def load_or_create_config(mode: str = "api") -> Dict[str, Any]:
     }
     env_cfg = _merge_defaults(env_cfg)
     if _validate_for_mode(env_cfg, mode):
-        print("Конфигурация загружена из переменных окружения.")
+        print("Configuration loaded from environment variables.")
         return env_cfg
 
     prepared = _prompt_config(mode, existing=file_cfg or env_cfg)
 
-    print("\nВНИМАНИЕ: секреты будут сохранены в открытом виде в файле")
+    print("\nWARNING: secrets are stored in plain text in file")
     print(CONFIG_FILE)
-    print("Рекомендуется использовать переменные окружения для продакшена.")
+    print("For production, use environment variables.")
 
     CONFIG_FILE.write_text(json.dumps(prepared, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Конфигурация сохранена в {CONFIG_FILE}")
+    print(f"Configuration saved to {CONFIG_FILE}")
     return prepared

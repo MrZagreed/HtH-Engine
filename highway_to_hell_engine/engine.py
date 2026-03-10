@@ -13,10 +13,10 @@ BAR_LEN = 14
 
 def _bar(progress: int, duration: int) -> str:
     if duration <= 0:
-        return "▱" * BAR_LEN
+        return "-" * BAR_LEN
     progress = max(0, min(progress, duration))
     filled = int(BAR_LEN * progress / max(1, duration))
-    return "▰" * filled + "▱" * (BAR_LEN - filled)
+    return "#" * filled + "-" * (BAR_LEN - filled)
 
 def _fmt_time(ms: int) -> str:
     ms = max(0, int(ms))
@@ -48,7 +48,7 @@ async def lyrics_engine(
     rpc_error_state,
     shutdown_event: asyncio.Event,
     get_track_func: Callable[[], Optional[Dict[str, Any]]],
-    config: dict  # добавлен параметр конфига
+    config: dict  # config parameter
 ):
     display = SmartLyricsDisplay(min_interval_s=0.2)
     warp = TimeWarp(
@@ -86,7 +86,7 @@ async def lyrics_engine(
         suffix = ZERO_WIDTH if flip else ""
 
         payload: Dict[str, Any] = {
-            "details": f"{artist} — {song}"[:128],
+            "details": f"{artist} - {song}"[:128],
             "state": f"{state}\n{bar} {time_txt}{suffix}"[:128],
             "instance": True
         }
@@ -118,22 +118,22 @@ async def lyrics_engine(
         else:
             stats["consecutive_failures"] += 1
             if stats["consecutive_failures"] > 3:
-                log(f"Много ошибок RPC: {stats['consecutive_failures']} подряд", "WARNING", "engine")
+                log(f"Many RPC errors: {stats['consecutive_failures']} in a row", "WARNING", "engine")
 
         if boundary:
             stats["boundary_updates"] += 1
         else:
             stats["updates_sent"] += 1
 
-    # Инициализация
+    # Initialization
     try:
         now_play = await asyncio.to_thread(get_track_func)
     except Exception as e:
-        log(f"Ошибка получения трека при старте движка: {e}", "ERROR", "engine")
+        log(f"Failed to read track at engine startup: {e}", "ERROR", "engine")
         now_play = None
 
     if not now_play or not now_play.get("is_playing") or not now_play.get("item"):
-        log("Нет активного трека, движок завершает работу", "WARNING", "engine")
+        log("No active track. Engine exits.", "WARNING", "engine")
         return
 
     init_progress = int(now_play.get("progress_ms") or 0)
@@ -153,7 +153,7 @@ async def lyrics_engine(
     last_idx = -1
     last_reported = init_reported_now
 
-    # Основной цикл
+    # Main loop
     while not shutdown_event.is_set():
         start_loop = time.time()
         try:
@@ -168,9 +168,9 @@ async def lyrics_engine(
             lag_ms = _clamp(now_ms - ts, -500, 1500)
             reported_now = max(0, progress + lag_ms)
 
-            # Защита от аномальных скачков
+            # Protection against anomalous jumps
             if reported_now < last_reported - 3000:
-                log(f"Скачок назад в reported: {last_reported} -> {reported_now}, принудительный снап", "WARNING", "engine")
+                log(f"Backward jump in reported progress: {last_reported} -> {reported_now}, forcing snap", "WARNING", "engine")
                 reported_now = last_reported
             last_reported = reported_now
 
@@ -178,7 +178,7 @@ async def lyrics_engine(
             dt = (time.time() - last_push_wall) * 1000.0
             shown_estimate = max(0, int(shown_estimate + dt))
 
-            # Не обгонять reported более чем на 2 сек
+            # Do not lead reported progress by more than 2s
             lead_cap = 2000
             if shown_estimate > reported_now + lead_cap:
                 shown_estimate = reported_now + lead_cap
@@ -187,7 +187,7 @@ async def lyrics_engine(
             corrected = _clamp(corrected, reported_now - 2000, reported_now + 2000)
             corrected = _clamp(corrected, 0, max(0, int(duration_state.get("ms", 0) or 0)))
 
-            # Определение границы строки
+            # Determine lyric boundary
             idx = -1
             for i in range(len(lyrics_data) - 1):
                 if lyrics_data[i][0] <= corrected < lyrics_data[i+1][0]:
@@ -211,13 +211,13 @@ async def lyrics_engine(
 
             if stagnation_count > 10:
                 force = True
-                log("Залипание прогресса Spotify, принудительное обновление", "DEBUG", "engine")
+                log("Spotify progress appears stalled, forcing update", "DEBUG", "engine")
 
             if (now_wall - stats["last_update_time"]) >= heartbeat_every:
                 force = True
                 stats["heartbeat_updates"] += 1
 
-            # Увеличен интервал до ~1 сек (было 0.9)
+            # Update interval tuning
             min_interval = config.get("min_update_interval", 1.2)
             need_push = force or boundary or ((now_wall - last_update_time) >= min_interval)
 
@@ -228,18 +228,18 @@ async def lyrics_engine(
                 last_update_time = now_wall
 
             processing_time = time.time() - start_loop
-            sleep_time = max(0.05, 1.0 - processing_time)  # было 0.22, теперь 1.0
+            sleep_time = max(0.05, 1.0 - processing_time)  # tuned sleep floor
             await asyncio.sleep(sleep_time)
 
         except asyncio.CancelledError:
             break
         except Exception as e:
-            log(f"Критическая ошибка в движке: {e}", "ERROR", "engine")
+            log(f"Critical engine error: {e}", "ERROR", "engine")
             log(traceback.format_exc(), "DEBUG", "engine")
             await asyncio.sleep(1.0)
 
     log(
-        f"ФИНАЛЬНАЯ СТАТИСТИКА ДВИЖКА: обновлений={stats['updates_sent'] + stats['boundary_updates'] + stats['heartbeat_updates']}, "
-        f"коррекций времени={warp.total_corrections}",
+        f"FINAL ENGINE STATS: updates={stats['updates_sent'] + stats['boundary_updates'] + stats['heartbeat_updates']}, "
+        f"time corrections={warp.total_corrections}",
         "INFO", "engine"
     )

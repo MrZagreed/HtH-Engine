@@ -17,7 +17,7 @@ from .diagnostics import discord_running, is_spotify_ad
 from .app_paths import SPOTIFY_CACHE_FILE, ensure_app_dirs
 from . import __version__
 
-# Тип функции получения текущего трека
+# Track fetch function type
 GetTrackFunc = Callable[[], Optional[Dict[str, Any]]]
 
 
@@ -54,7 +54,7 @@ def _buttons_payload(url: str) -> Optional[list[Dict[str, str]]]:
     return [{"label": "Open in Spotify", "url": safe}]
 
 class TrackCache:
-    """Простое кэширование данных трека для уменьшения числа запросов к API."""
+    """Simple track data cache to reduce API calls."""
     def __init__(self, ttl: float = 2.0):
         self.ttl = ttl
         self._data: Optional[Dict[str, Any]] = None
@@ -72,13 +72,13 @@ class TrackCache:
         return self._data
 
 async def _load_lyrics_background(lines_target: list, duration_state: Dict[str, Any], song: str, artist: str, dur: int) -> None:
-    log(f"Загрузка текста: {song} — {artist}", "INFO", "lyrics")
+    log(f"Loading lyrics: {song} - {artist}", "INFO", "lyrics")
     try:
         lines = await asyncio.to_thread(fetch_lyrics, song, artist, dur)
     except asyncio.CancelledError:
         return
     except Exception as e:
-        log(f"Ошибка загрузки текста: {e}", "ERROR", "lyrics")
+        log(f"Lyrics loading error: {e}", "ERROR", "lyrics")
         lines = []
 
     lines_target.clear()
@@ -94,7 +94,7 @@ async def _load_lyrics_background(lines_target: list, duration_state: Dict[str, 
                 duration_state["ms"] = max(detected_ms, int(duration_state.get("ms", dur)))
             duration_state["estimated"] = False
 
-    log(f"Текст: {len(lines_target)} строк -> {song} — {artist}", "INFO", "lyrics")
+    log(f"Lyrics: {len(lines_target)} lines -> {song} - {artist}", "INFO", "lyrics")
 
 async def run_presence(
     config: Dict[str, Any],
@@ -107,11 +107,11 @@ async def run_presence(
     try:
         rpc = AioPresence(config["discord_client_id"])
         await rpc.connect()
-        log("RPC подключено", "INFO", "main")
+        log("RPC connected", "INFO", "main")
     except Exception as e:
-        log(f"Не удалось подключиться к Discord RPC: {e}", "ERROR", "main")
+        log(f"Failed to connect to Discord RPC: {e}", "ERROR", "main")
         if not discord_running():
-            log("Discord не запущен. Ожидание запуска...", "WARNING", "main")
+            log("Discord is not running. Waiting for startup...", "WARNING", "main")
         async def ensure():
             while not shutdown_event.is_set():
                 try:
@@ -121,7 +121,7 @@ async def run_presence(
                     await asyncio.sleep(2.0)
         asyncio.create_task(ensure())
 
-    # ---------- Выбор источника данных ----------
+    # ---------- Data source selection ----------
     get_track_func: GetTrackFunc
     server = None
 
@@ -136,21 +136,21 @@ async def run_presence(
             cache_path=str(SPOTIFY_CACHE_FILE),
             open_browser=False
         ))
-        rpc.spotify = sp  # для обратной совместимости
+        rpc.spotify = sp  # backward compatibility
         get_track_func = lambda: sp.current_user_playing_track()
-        log("Режим API: используется Web API (требуется Premium)", "INFO", "main")
+        log("API mode: using Spotify Web API (Premium required)", "INFO", "main")
     else:  # local
         try:
             from .local_monitor import LocalSpotifyMonitor
         except ImportError as e:
-            log(f"Модуль local_monitor не найден: {e}. Установите swspotify.", "ERROR", "main")
+            log(f"local_monitor module not found: {e}. Install swspotify.", "ERROR", "main")
             return
         monitor = LocalSpotifyMonitor()
         get_track_func = monitor.get_current_track
         rpc.spotify = None
-        log("Режим LOCAL: отслеживание локального клиента Spotify (без Premium)", "INFO", "main")
+        log("LOCAL mode: tracking local Spotify client (no Premium required)", "INFO", "main")
 
-    # ---------- Общие компоненты ----------
+    # ---------- Shared components ----------
     rpc_lock = asyncio.Lock()
     rpc_error = {"fails": 0, "suspended": False}
     net = NetworkMonitor()
@@ -164,9 +164,9 @@ async def run_presence(
     idle_presence_sent = False
     last_wait_log = 0.0
 
-    log("Запуск основного цикла…", "INFO", "main")
+    log("Starting main loop...", "INFO", "main")
     while not shutdown_event.is_set():
-        # Проверка сети перед запросом
+        # Network check before requests
         if not net.check():
             await asyncio.sleep(5)
             continue
@@ -174,20 +174,20 @@ async def run_presence(
         try:
             tr = await asyncio.to_thread(track_cache.get, get_track_func)
         except Exception as e:
-            log(f"Ошибка получения трека: {e}", "ERROR", "main")
+            log(f"Track read error: {e}", "ERROR", "main")
             await asyncio.sleep(1.0)
             continue
 
         if not tr or not tr.get("is_playing"):
             now = time.time()
             if now - last_wait_log >= 15:
-                log("Ожидание: Spotify не воспроизводит трек или данные недоступны", "INFO", "main")
+                log("Waiting: Spotify is not playing or track data unavailable", "INFO", "main")
                 last_wait_log = now
 
             if not idle_presence_sent:
                 payload = {
-                    "details": "Spotify запущен",
-                    "state": "Ожидание воспроизведения трека",
+                    "details": "Spotify is running",
+                    "state": "Waiting for playback",
                 }
                 payload.update(_presence_assets(config))
                 try:
@@ -195,24 +195,24 @@ async def run_presence(
                         await rpc.update(**payload)
                     idle_presence_sent = True
                 except Exception as e:
-                    log(f"Не удалось обновить RPC в режиме ожидания: {e}", "DEBUG", "main")
+                    log(f"Failed to update RPC in idle state: {e}", "DEBUG", "main")
 
             await asyncio.sleep(0.5)
             continue
 
-        # Определение рекламы (унифицированная функция)
+        # Ad detection (shared helper)
         is_ad = is_spotify_ad(tr)
         if is_ad:
             payload = {
-                "details": "Реклама в Spotify",
-                "state": "Подождите окончание блока…",
+                "details": "Spotify advertisement",
+                "state": "Please wait until ad block ends...",
             }
             payload.update(_presence_assets(config))
             try:
                 async with rpc_lock:
                     await rpc.update(**payload)
             except Exception as e:
-                log(f"Не удалось обновить RPC в режиме рекламы: {e}", "DEBUG", "main")
+                log(f"Failed to update RPC in ad state: {e}", "DEBUG", "main")
             await asyncio.sleep(1.0)
             continue
 
@@ -239,7 +239,7 @@ async def run_presence(
                 except asyncio.CancelledError:
                     pass
                 except Exception as e:
-                    log(f"Ошибка при отмене предыдущей задачи: {e}", "ERROR", "main")
+                    log(f"Error while cancelling previous task: {e}", "ERROR", "main")
 
             if lyrics_loader_task and not lyrics_loader_task.done():
                 lyrics_loader_task.cancel()
@@ -247,8 +247,8 @@ async def run_presence(
             progress_ms = int(tr.get("progress_ms") or 0)
             try:
                 payload = {
-                    "details": f"{artist} — {song}"[:128],
-                    "state": "Синхронизация текста...",
+                    "details": f"{artist} - {song}"[:128],
+                    "state": "Syncing lyrics...",
                     "instance": True,
                 }
                 buttons = _buttons_payload(url)
@@ -263,7 +263,7 @@ async def run_presence(
                 async with rpc_lock:
                     await rpc.update(**payload)
             except Exception as e:
-                log(f"Не удалось отправить мгновенный RPC апдейт: {e}", "DEBUG", "main")
+                log(f"Failed to send immediate RPC update: {e}", "DEBUG", "main")
 
             lines: list[tuple[int, str]] = []
             duration_state: Dict[str, Any] = {"ms": dur, "estimated": duration_is_estimate}
@@ -280,7 +280,7 @@ async def run_presence(
 
         await asyncio.sleep(poll_interval)
 
-    # Завершение
+    # Shutdown
     try:
         if lyrics_task:
             lyrics_task.cancel()
@@ -296,19 +296,19 @@ async def run_presence(
             pass
 
 async def main(config: Dict[str, Any], mode: str = 'api') -> None:
-    log(f"=== ЗАПУСК SPOTIFY DISCORD LYRICS PRESENCE v{__version__} ===", "INFO", "main")
-    log(f"Режим работы: {mode.upper()}", "INFO", "main")
-    log(f"Основной лог: {LOG_FILE}", "INFO", "main")
-    log(f"Отладочный лог: {DEBUG_LOG_FILE}", "INFO", "main")
+    log(f"=== STARTING HIGHWAY TO HELL ENGINE v{__version__} ===", "INFO", "main")
+    log(f"Mode: {mode.upper()}", "INFO", "main")
+    log(f"Main log: {LOG_FILE}", "INFO", "main")
+    log(f"Debug log: {DEBUG_LOG_FILE}", "INFO", "main")
 
     shutdown_event = asyncio.Event()
     try:
         await run_presence(config, shutdown_event, mode)
     except KeyboardInterrupt:
-        log("Получен сигнал прерывания", "INFO", "main")
+        log("Interrupt signal received", "INFO", "main")
     except Exception as e:
-        log(f"Критическая ошибка: {e}", "CRITICAL", "main")
+        log(f"Critical error: {e}", "CRITICAL", "main")
         log(traceback.format_exc(), "DEBUG", "main")
     finally:
         shutdown_event.set()
-        log("Приложение завершено", "INFO", "main")
+        log("Application finished", "INFO", "main")

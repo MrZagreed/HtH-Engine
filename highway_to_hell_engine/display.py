@@ -5,8 +5,8 @@ from .logging_setup import log
 
 class SmartLyricsDisplay:
     """
-    Отрисовка 2–3 строк текста с простым пейджингом для длинных строк.
-    render(lyrics_data, progress_ms) -> str (до 3 строк, разделенных \n)
+    Renders 2-3 lyric lines with simple paging for long lines.
+    render(lyrics_data, progress_ms) -> str (up to 3 lines joined by \n)
     """
     def __init__(self, max_lines: int = 3, max_line_length: int = 42, min_interval_s: float = 0.2):
         self.max_lines = max_lines
@@ -35,16 +35,16 @@ class SmartLyricsDisplay:
     def render(self, lyrics_data: List[Tuple[int, str]], progress_ms: int) -> str:
         now = time.time()
 
-        # Rate-limit отрисовку
+        # Render rate limit
         if now - self._last_render_t < self.min_interval_s:
             return self._cached
 
         if not lyrics_data:
-            self._cached = "Текст не найден\n\nОжидание данных…"
+            self._cached = "Lyrics not found\n\nWaiting for data..."
             self._last_render_t = now
             return self._cached
 
-        # Текущая строка
+        # Current line
         idx = -1
         for i in range(len(lyrics_data) - 1):
             if lyrics_data[i][0] <= progress_ms < lyrics_data[i+1][0]:
@@ -59,7 +59,7 @@ class SmartLyricsDisplay:
             self._page_index = 0
             self.stats["line_changes"] += 1
             if self.stats["line_changes"] % 10 == 0:
-                log(f"Смена строк: {self.stats['line_changes']} всего", "DEBUG", "display")
+                log(f"Line switches: {self.stats['line_changes']} total", "DEBUG", "display")
 
         prev_text = lyrics_data[idx-1][1] if idx > 0 else ""
         curr_text = lyrics_data[idx][1] if idx >= 0 else ""
@@ -69,7 +69,7 @@ class SmartLyricsDisplay:
         curr_chunks = self._wrap(curr_text)
         next_chunks = self._wrap(next_text)
 
-        # Пагинация текущей строки
+        # Current-line pagination
         if len(curr_chunks) > 1:
             self._page_index = (self._page_index + 1) % len(curr_chunks)
             self.stats["page_flips"] += 1

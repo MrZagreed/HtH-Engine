@@ -17,11 +17,11 @@ except ImportError:
     import sys
     from pathlib import Path
     sys.path.append(str(Path(__file__).resolve().parents[1]))
-    from duality.tempo import TempoSynchronizer
-    from duality.logging_setup import log
-    from duality.app_paths import LYRICS_DB_FILE, ensure_app_dirs
+    from highway_to_hell_engine.tempo import TempoSynchronizer
+    from highway_to_hell_engine.logging_setup import log
+    from highway_to_hell_engine.app_paths import LYRICS_DB_FILE, ensure_app_dirs
 
-CACHE_TTL_SEC = 7 * 24 * 3600  # 7 дней
+CACHE_TTL_SEC = 7 * 24 * 3600  # 7 days
 REQUEST_TIMEOUT = 10
 UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -32,7 +32,7 @@ _TS = re.compile(r"\[(?:(?P<h>\d{1,2}):)?(?P<m>\d{1,2}):(?P<s>\d{1,2})(?:\.(?P<m
 
 
 def _cut(s: str, n: int) -> str:
-    return s if len(s) <= n else s[: max(0, n - 1)] + "…"
+    return s if len(s) <= n else s[: max(0, n - 1)] + "..."
 
 
 def _norm(s: str) -> str:
@@ -151,7 +151,7 @@ def _load_cache_entry(cache_key: str) -> Optional[List[Tuple[int, str]]]:
             payload = json.loads(row[0])
             return [(int(t), str(l)) for t, l in payload]
     except Exception as e:
-        log(f"Ошибка чтения SQLite кеша: {e}", "WARNING", "lyrics")
+        log(f"SQLite cache read error: {e}", "WARNING", "lyrics")
         return None
 
 
@@ -176,7 +176,7 @@ def _save_cache_entry(cache_key: str, artist: str, song: str, lines: List[Tuple[
             )
             conn.execute("DELETE FROM lyrics_cache WHERE created_at < ?", (cutoff,))
     except Exception as e:
-        log(f"Не удалось сохранить SQLite кеш: {e}", "WARNING", "lyrics")
+        log(f"Failed to save SQLite cache: {e}", "WARNING", "lyrics")
 
 
 # ---------------------------
@@ -191,7 +191,7 @@ def _lrclib(song: str, artist: str) -> Optional[List[Tuple[int, str]] | List[str
         if data and data.get("plainLyrics"):
             return _as_plain_lines(data["plainLyrics"])
     except Exception as e:
-        log(f"LRCLIB get ошибка: {e}", "WARNING", "lyrics")
+        log(f"LRCLIB get error: {e}", "WARNING", "lyrics")
 
     try:
         q = _request_json(
@@ -218,7 +218,7 @@ def _lrclib(song: str, artist: str) -> Optional[List[Tuple[int, str]] | List[str
             if best.get("plainLyrics"):
                 return _as_plain_lines(best["plainLyrics"])
     except Exception as e:
-        log(f"LRCLIB search ошибка: {e}", "WARNING", "lyrics")
+        log(f"LRCLIB search error: {e}", "WARNING", "lyrics")
 
     return None
 
@@ -229,7 +229,7 @@ def _lyrics_ovh(song: str, artist: str) -> Optional[List[str]]:
         if j and "lyrics" in j:
             return _as_plain_lines(j["lyrics"])
     except Exception as e:
-        log(f"lyrics.ovh ошибка: {e}", "WARNING", "lyrics")
+        log(f"lyrics.ovh error: {e}", "WARNING", "lyrics")
     return None
 
 
@@ -261,7 +261,7 @@ def _genius_plain(song: str, artist: str) -> Optional[List[str]]:
         lines = [ln.strip() for ln in txt.splitlines() if ln.strip()]
         return lines or None
     except Exception as e:
-        log(f"Genius парсинг ошибка: {e}", "WARNING", "lyrics")
+        log(f"Genius parsing error: {e}", "WARNING", "lyrics")
         return None
 
 
@@ -279,12 +279,12 @@ def _musixmatch_plain(song: str, artist: str) -> Optional[List[str]]:
         lines = [ln.strip() for ln in txt.splitlines() if ln.strip()]
         return lines or None
     except Exception as e:
-        log(f"Musixmatch парсинг ошибка: {e}", "WARNING", "lyrics")
+        log(f"Musixmatch parsing error: {e}", "WARNING", "lyrics")
         return None
 
 
 def _azlyrics_plain(song: str, artist: str) -> Optional[List[str]]:
-    """Дополнительный источник plain-lyrics через страницу поиска AZLyrics."""
+    """Additional plain-lyrics source via AZLyrics search page."""
     try:
         search_url = f"https://search.azlyrics.com/search.php?q={quote_plus(f'{artist} {song}')}"
         html = _request_html(search_url)
@@ -306,7 +306,7 @@ def _azlyrics_plain(song: str, artist: str) -> Optional[List[str]]:
             return None
 
         soup = BeautifulSoup(track_html, "html.parser")
-        # Текст лежит в div без класса внутри основного контейнера.
+        # Lyrics text is stored in an unclassed div inside the main container.
         blocks = soup.select("div.col-xs-12.col-lg-8.text-center > div")
         target = None
         for b in blocks:
@@ -321,7 +321,7 @@ def _azlyrics_plain(song: str, artist: str) -> Optional[List[str]]:
         lines = [ln.strip() for ln in target.splitlines() if ln.strip()]
         return lines or None
     except Exception as e:
-        log(f"AZLyrics парсинг ошибка: {e}", "WARNING", "lyrics")
+        log(f"AZLyrics parsing error: {e}", "WARNING", "lyrics")
         return None
 
 
@@ -351,14 +351,14 @@ def fetch_lyrics(song: str, artist: str, duration_ms: Optional[int] = None) -> L
         lrclib = _lrclib(song, artist)
         if isinstance(lrclib, list) and lrclib and isinstance(lrclib[0], tuple):
             lines = _save(lrclib, "lrclib_synced")
-            log(f"LRCLIB synced: {_cut(artist, 24)} — {_cut(song, 32)} [{len(lines)}]", "INFO", "lyrics")
+            log(f"LRCLIB synced: {_cut(artist, 24)} - {_cut(song, 32)} [{len(lines)}]", "INFO", "lyrics")
             return lines
         if isinstance(lrclib, list) and lrclib and isinstance(lrclib[0], str):
             lines = _save(sync.synchronize(lrclib, dur, song, artist), "lrclib_plain")
-            log(f"LRCLIB plain->sync: {_cut(artist, 24)} — {_cut(song, 32)} [{len(lines)}]", "INFO", "lyrics")
+            log(f"LRCLIB plain->sync: {_cut(artist, 24)} - {_cut(song, 32)} [{len(lines)}]", "INFO", "lyrics")
             return lines
     except Exception as e:
-        log(f"LRCLIB недоступен: {e}", "WARNING", "lyrics")
+        log(f"LRCLIB unavailable: {e}", "WARNING", "lyrics")
 
     sources: List[Tuple[str, Callable[[str, str], Optional[List[str]]]]] = [
         ("genius", _genius_plain),
@@ -372,12 +372,12 @@ def fetch_lyrics(song: str, artist: str, duration_ms: Optional[int] = None) -> L
             plain = provider(song, artist)
             if plain:
                 lines = _save(sync.synchronize(plain, dur, song, artist), f"{source_name}_plain")
-                log(f"{source_name} plain->sync: {_cut(artist, 24)} — {_cut(song, 32)} [{len(lines)}]", "INFO", "lyrics")
+                log(f"{source_name} plain->sync: {_cut(artist, 24)} - {_cut(song, 32)} [{len(lines)}]", "INFO", "lyrics")
                 return lines
         except Exception as e:
-            log(f"{source_name} недоступен: {e}", "WARNING", "lyrics")
+            log(f"{source_name} unavailable: {e}", "WARNING", "lyrics")
 
-    log(f"Текст не найден: {song} — {artist}", "WARNING", "lyrics")
+    log(f"Lyrics not found: {song} - {artist}", "WARNING", "lyrics")
     _save_cache_entry(cache_key, artist, song, [], "not_found")
     return []
 

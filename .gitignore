@@ -5,7 +5,7 @@ __pycache__/
 *.pyd
 
 # Virtual environments
-duality_venv/
+highway_to_hell_engine_venv/
 .venv/
 venv/
 
@@ -14,11 +14,11 @@ logs/
 *.log
 
 # Local data
-.duality_cache/
+.highway_to_hell_engine_cache/
 .spotify_cache
 .spotify_cache*
-duality_data/config/duality_config.json
-duality_data/cache/
+highway_to_hell_engine_data/config/highway_to_hell_engine_config.json
+highway_to_hell_engine_data/cache/
 
 # OS/editor
 .DS_Store
@@ -28,3 +28,7 @@ Thumbs.db
 
 # Codex local metadata
 .codex/
+
+# Legacy local folders
+duality_venv/
+duality_data/
