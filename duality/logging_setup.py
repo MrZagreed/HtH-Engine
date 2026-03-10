@@ -1,9 +1,8 @@
 import logging
 import os
-import sys
+import re
 from datetime import datetime
 from pathlib import Path
-import glob
 
 try:
     from colorama import init as color_init, Fore, Style
@@ -11,12 +10,13 @@ try:
     _COLORS = True
 except ImportError:
     _COLORS = False
-    # Заглушки для цветов
+
     class Fore:
-        RED=GREEN=YELLOW=BLUE=CYAN=MAGENTA=WHITE=RESET=""
+        RED = GREEN = YELLOW = BLUE = CYAN = MAGENTA = WHITE = RESET = ""
+
     class Style:
-        RESET_ALL=""
-    # Логируем отсутствие colorama, но позже, когда логгер уже создан
+        RESET_ALL = ""
+
     _missing_colorama = True
 else:
     _missing_colorama = False
@@ -24,21 +24,55 @@ else:
 LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
-def cleanup_old_logs(max_logs: int = 5):
+_LOG_RE = re.compile(r"^(debug|duality)_(\d{8}_\d{6})\.log$")
+
+
+def cleanup_old_logs(max_sessions: int = 5) -> None:
+    """
+    Хранит только последние `max_sessions` запусков.
+    Один запуск = 2 файла (debug_* и duality_*).
+    """
     try:
         log_files = list(LOG_DIR.glob("*.log"))
-        log_files.sort(key=lambda x: x.stat().st_mtime)
-        while len(log_files) > max_logs:
-            old = log_files.pop(0)
-            old.unlink(missing_ok=True)
+        sessions = {}
+        extra_files = []
+
+        for path in log_files:
+            m = _LOG_RE.match(path.name)
+            if not m:
+                extra_files.append(path)
+                continue
+            ts = m.group(2)
+            sessions.setdefault(ts, []).append(path)
+
+        keep_ts = set(sorted(sessions.keys(), reverse=True)[:max_sessions])
+        to_delete = []
+
+        for ts, files in sessions.items():
+            if ts not in keep_ts:
+                to_delete.extend(files)
+
+        # Для нестандартных логов оставляем только последние 10.
+        extra_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        to_delete.extend(extra_files[10:])
+
+        for old in to_delete:
+            try:
+                old.unlink(missing_ok=True)
+            except Exception:
+                # Если файл занят другим процессом, не останавливаем очистку.
+                continue
     except Exception:
+        # Очистка логов не должна ронять приложение.
         pass
+
 
 cleanup_old_logs(5)
 
-timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 LOG_FILE = LOG_DIR / f"duality_{timestamp}.log"
 DEBUG_LOG_FILE = LOG_DIR / f"debug_{timestamp}.log"
+
 
 class AdvancedLogger:
     def __init__(self, level: str = "INFO"):
@@ -78,16 +112,18 @@ class AdvancedLogger:
         self.logger.addHandler(dh)
         self.logger.addHandler(ch)
 
-        # Если colorama отсутствует, логируем предупреждение (после инициализации логгера)
         if _missing_colorama:
-            self.log("colorama не установлен — цвета в консоли отключены.", "WARNING", "logging")
+            self.log("WARNING", "colorama не установлен — цвета в консоли отключены.", "logging")
 
     def log(self, level: str, msg: str, component: str = "main"):
         getattr(self.logger, level.lower())(msg)
 
+
 LOGGER = AdvancedLogger(level=os.environ.get("DUALITY_LOG_LEVEL", "INFO"))
+
 
 def log(msg: str, level: str = "INFO", component: str = "main"):
     LOGGER.log(level, msg)
+
 
 __all__ = ["log", "LOGGER", "LOG_FILE", "DEBUG_LOG_FILE"]

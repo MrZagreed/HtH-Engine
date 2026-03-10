@@ -321,10 +321,15 @@ def ensure_env_and_reexec() -> None:
     print(f"[bootstrap] Перезапуск в venv: {venv_python}\n")
 
     if os.name == "nt":
-        cmd = subprocess.list2cmdline(new_argv)
-        subprocess.Popen(cmd, shell=True)
-        time.sleep(2)
-        raise SystemExit(0)
+        # На Windows используем execv, чтобы не плодить detached-процессы.
+        # Это снижает риск множества фоновых копий и блокировки старых логов.
+        try:
+            os.execv(str(venv_python), new_argv)
+        except Exception:
+            cmd = subprocess.list2cmdline(new_argv)
+            subprocess.Popen(cmd, shell=True)
+            time.sleep(1)
+            raise SystemExit(0)
 
     os.execv(str(venv_python), new_argv)
 
