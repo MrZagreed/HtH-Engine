@@ -128,7 +128,3 @@ Mr.Zagreed
 
 
 
-## Безопасный релиз
-1. Запусти: `py -3.12 scripts/release_guard.py --create-archive`
-2. Следуй шагам из: `RELEASE_CHECKLIST.md`
-3. Публикуй тег `v1.0.0` и прикрепляй `dist/hth-engine-v1.0.0.zip`

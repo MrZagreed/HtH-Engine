@@ -66,7 +66,6 @@ class RPCClient:
                 log(f"Discord connection error: {e} (attempt {attempt + 1})", "ERROR", "rpc")
                 self.stats['last_error'] = str(e)
 
-            # Progressive delay between attempts
             delay = RECONNECT_DELAYS[min(attempt, len(RECONNECT_DELAYS) - 1)]
             log(f"Retrying in {delay} seconds...", "DEBUG", "rpc")
             await asyncio.sleep(delay)
@@ -81,7 +80,6 @@ class RPCClient:
         """
         start_time = time.time()
         
-        # Check if updates are suspended
         if self.error_state.get("suspended", False):
             suspend_time = time.time() - self.error_state.get("suspend_time", 0)
             if suspend_time < 30:  # 30-second suspension window
@@ -89,12 +87,10 @@ class RPCClient:
                     log(f"RPC suspended, remaining {30 - int(suspend_time)}s", "WARNING", "rpc")
                 return False
             else:
-                # Attempt automatic recovery
                 self.error_state["suspended"] = False
                 self.error_state["fails"] = 0
                 log("RPC auto-recovered after suspension", "INFO", "rpc")
 
-        # Check connection state
         if not self.connected:
             log("RPC not connected, trying reconnect...", "WARNING", "rpc")
             if not await self.connect():
@@ -106,21 +102,17 @@ class RPCClient:
                 await asyncio.wait_for(self.rpc.update(**payload), timeout=RPC_TIMEOUT_S)
                 update_time = time.time() - update_start
 
-            # Successful update
             self.error_state["fails"] = 0
             self.error_state["suspended"] = False
             self.stats['last_success'] = time.time()
             self.stats['updates_sent'] += 1
             
-            # Update average update time
             total_time = self.stats['average_update_time'] * (self.stats['updates_sent'] - 1)
             self.stats['average_update_time'] = (total_time + update_time) / self.stats['updates_sent']
             
-            # Log slow updates
             if update_time > 1.0:
                 log(f"Slow RPC update: {update_time:.2f}s", "DEBUG", "rpc")
                 
-            # Periodic stats
             if self.stats['updates_sent'] % 50 == 0:
                 self._log_statistics()
                 
@@ -166,7 +158,6 @@ class RPCClient:
         log(f"RPC error #{self.error_state['fails']}: {error_msg}", 
             "ERROR" if self.error_state["fails"] > 3 else "WARNING", "rpc")
 
-        # Suspend updates after too many errors
         if self.error_state["fails"] >= MAX_CONSECUTIVE_FAILURES and not self.error_state["suspended"]:
             self.error_state["suspended"] = True
             self.error_state["suspend_time"] = time.time()
@@ -226,13 +217,11 @@ class RPCClient:
         }
 
 
-# Legacy compatibility
 async def safe_rpc_update(rpc: AioPresence, payload: Dict[str, Any], rpc_lock: asyncio.Lock, error_state: Dict[str, Any]) -> bool:
     """
     Legacy-compatible function
     Returns True if update succeeded
     """
-    # Create temporary compatibility client
     temp_client = RPCClient("temp")
     temp_client.rpc = rpc
     temp_client.connected = True

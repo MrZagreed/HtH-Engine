@@ -136,7 +136,6 @@ def _prompt_config(mode: str, lang: str, existing: Dict[str, Any] | None = None)
         cfg["spotify_client_id"] = spotify_client_id
         cfg["spotify_secret"] = spotify_secret
     else:
-        # Spotify API credentials are optional in local mode.
         cfg.setdefault("spotify_client_id", "")
         cfg.setdefault("spotify_secret", "")
 

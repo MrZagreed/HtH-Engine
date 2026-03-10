@@ -115,9 +115,6 @@ def parse_lrclib_synced(text: str) -> List[Tuple[int, str]]:
     return _dedup_sorted(out)
 
 
-# ---------------------------
-# SQLite cache
-# ---------------------------
 
 def _db_connect() -> sqlite3.Connection:
     ensure_app_dirs()
@@ -179,9 +176,6 @@ def _save_cache_entry(cache_key: str, artist: str, song: str, lines: List[Tuple[
         log(f"Failed to save SQLite cache: {e}", "WARNING", "lyrics")
 
 
-# ---------------------------
-# Sources
-# ---------------------------
 
 def _lrclib(song: str, artist: str) -> Optional[List[Tuple[int, str]] | List[str]]:
     try:
@@ -306,7 +300,6 @@ def _azlyrics_plain(song: str, artist: str) -> Optional[List[str]]:
             return None
 
         soup = BeautifulSoup(track_html, "html.parser")
-        # Lyrics text is stored in an unclassed div inside the main container.
         blocks = soup.select("div.col-xs-12.col-lg-8.text-center > div")
         target = None
         for b in blocks:
@@ -325,9 +318,6 @@ def _azlyrics_plain(song: str, artist: str) -> Optional[List[str]]:
         return None
 
 
-# ---------------------------
-# Main
-# ---------------------------
 
 def fetch_lyrics(song: str, artist: str, duration_ms: Optional[int] = None) -> List[Tuple[int, str]]:
     song = song or ""
@@ -346,7 +336,6 @@ def fetch_lyrics(song: str, artist: str, duration_ms: Optional[int] = None) -> L
         _save_cache_entry(cache_key, artist, song, out, source)
         return out
 
-    # 1) LRCLIB
     try:
         lrclib = _lrclib(song, artist)
         if isinstance(lrclib, list) and lrclib and isinstance(lrclib[0], tuple):

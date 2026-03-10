@@ -128,7 +128,3 @@ March 10, 2026
 
 
 
-## Safe release
-1. Run: `py -3.12 scripts/release_guard.py --create-archive`
-2. Follow: `RELEASE_CHECKLIST.md`
-3. Publish tag `v1.0.0` and upload `dist/hth-engine-v1.0.0.zip`

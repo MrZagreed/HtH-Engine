@@ -35,7 +35,6 @@ class SmartLyricsDisplay:
     def render(self, lyrics_data: List[Tuple[int, str]], progress_ms: int) -> str:
         now = time.time()
 
-        # Render rate limit
         if now - self._last_render_t < self.min_interval_s:
             return self._cached
 
@@ -44,7 +43,6 @@ class SmartLyricsDisplay:
             self._last_render_t = now
             return self._cached
 
-        # Current line
         idx = -1
         for i in range(len(lyrics_data) - 1):
             if lyrics_data[i][0] <= progress_ms < lyrics_data[i+1][0]:
@@ -69,7 +67,6 @@ class SmartLyricsDisplay:
         curr_chunks = self._wrap(curr_text)
         next_chunks = self._wrap(next_text)
 
-        # Current-line pagination
         if len(curr_chunks) > 1:
             self._page_index = (self._page_index + 1) % len(curr_chunks)
             self.stats["page_flips"] += 1

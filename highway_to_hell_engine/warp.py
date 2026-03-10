@@ -69,7 +69,6 @@ class TimeWarp:
     def _maybe_log(self, now: float, reported_ms: int, shown_ms: int, corrected_ms: int, error: int | None = None):
         if error is None:
             error = reported_ms - shown_ms
-        # Log less often: every 30s or every 100 corrections
         log_every = 30.0
         if (now - self.last_log_time) >= log_every or self.total_corrections % 100 == 0 or abs(error) > 5000:
             avg = sum(self.drift_history)/len(self.drift_history) if self.drift_history else 0.0

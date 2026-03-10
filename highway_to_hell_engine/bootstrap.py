@@ -321,8 +321,6 @@ def ensure_env_and_reexec() -> None:
     print(f"[bootstrap] Re-executing in venv: {venv_python}\n")
 
     if os.name == "nt":
-        # On Windows, use execv to avoid spawning detached processes.
-        # This reduces the risk of background duplicates and log file locks.
         try:
             os.execv(str(venv_python), new_argv)
         except Exception:

@@ -52,7 +52,6 @@ def cleanup_old_logs(max_sessions: int = 5) -> None:
             if ts not in keep_ts:
                 to_delete.extend(files)
 
-        # Keep only last 10 nonstandard log files.
         extra_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         to_delete.extend(extra_files[10:])
 
@@ -60,10 +59,8 @@ def cleanup_old_logs(max_sessions: int = 5) -> None:
             try:
                 old.unlink(missing_ok=True)
             except Exception:
-                # If file is locked by another process, continue cleanup.
                 continue
     except Exception:
-        # Log cleanup must never crash the app.
         pass
 
 

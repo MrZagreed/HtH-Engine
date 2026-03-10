@@ -125,7 +125,6 @@ async def lyrics_engine(
         else:
             stats["updates_sent"] += 1
 
-    # Initialization
     try:
         now_play = await asyncio.to_thread(get_track_func)
     except Exception as e:
@@ -154,7 +153,6 @@ async def lyrics_engine(
     last_reported = init_reported_now
     last_seek_resync_log_ts = 0.0
 
-    # Main loop
     while not shutdown_event.is_set():
         start_loop = time.time()
         try:
@@ -169,9 +167,6 @@ async def lyrics_engine(
             lag_ms = _clamp(now_ms - ts, -500, 1500)
             reported_now = max(0, progress + lag_ms)
 
-            # Protection against anomalous jumps.
-            # Large backward jumps can be real seeks/restarts in local mode,
-            # so resync instead of freezing progress and spamming warnings.
             if reported_now < last_reported - 3000:
                 backward_delta = last_reported - reported_now
                 if backward_delta >= 15000 or reported_now <= 5000:
@@ -200,7 +195,6 @@ async def lyrics_engine(
             dt = (time.time() - last_push_wall) * 1000.0
             shown_estimate = max(0, int(shown_estimate + dt))
 
-            # Do not lead reported progress by more than 2s
             lead_cap = 2000
             if shown_estimate > reported_now + lead_cap:
                 shown_estimate = reported_now + lead_cap
@@ -209,7 +203,6 @@ async def lyrics_engine(
             corrected = _clamp(corrected, reported_now - 2000, reported_now + 2000)
             corrected = _clamp(corrected, 0, max(0, int(duration_state.get("ms", 0) or 0)))
 
-            # Determine lyric boundary
             idx = -1
             for i in range(len(lyrics_data) - 1):
                 if lyrics_data[i][0] <= corrected < lyrics_data[i+1][0]:
@@ -239,7 +232,6 @@ async def lyrics_engine(
                 force = True
                 stats["heartbeat_updates"] += 1
 
-            # Update interval tuning
             min_interval = config.get("min_update_interval", 1.2)
             need_push = force or boundary or ((now_wall - last_update_time) >= min_interval)
 

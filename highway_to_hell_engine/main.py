@@ -18,7 +18,6 @@ from .app_paths import SPOTIFY_CACHE_FILE, ensure_app_dirs
 from .authorship import enforce_authorship
 from . import __version__
 
-# Track fetch function type
 GetTrackFunc = Callable[[], Optional[Dict[str, Any]]]
 
 
@@ -109,7 +108,6 @@ async def run_presence(
 ) -> None:
     ensure_app_dirs()
 
-    # ---------- Discord RPC ----------
     try:
         rpc = AioPresence(config["discord_client_id"])
         await rpc.connect()
@@ -129,7 +127,6 @@ async def run_presence(
 
         asyncio.create_task(ensure())
 
-    # ---------- Data source selection ----------
     get_track_func: GetTrackFunc
     server = None
 
@@ -160,7 +157,6 @@ async def run_presence(
         rpc.spotify = None
         log("LOCAL mode: tracking local Spotify client (no Premium required)", "INFO", "main")
 
-    # ---------- Shared components ----------
     rpc_lock = asyncio.Lock()
     rpc_error = {"fails": 0, "suspended": False}
     net = NetworkMonitor()
@@ -177,7 +173,6 @@ async def run_presence(
 
     log("Starting main loop...", "INFO", "main")
     while not shutdown_event.is_set():
-        # Network diagnostics before requests.
         net_ok, net_latency_ms, _ = net.check_with_latency(timeout=0.9)
         if not net_ok:
             fail_count = net.consecutive_failures
@@ -192,13 +187,11 @@ async def run_presence(
                 )
                 last_net_diag_log = now_diag
 
-            # API mode depends on network for playback and lyrics.
             if mode == "api":
                 backoff = min(8.0, 0.5 * fail_count)
                 await asyncio.sleep(backoff)
                 continue
 
-            # Local mode keeps running, but reduce loop pressure under instability.
             if fail_count >= 3:
                 await asyncio.sleep(min(2.5, 0.3 * fail_count))
         else:
@@ -241,7 +234,6 @@ async def run_presence(
             await asyncio.sleep(0.5)
             continue
 
-        # Ad detection (shared helper)
         is_ad = is_spotify_ad(tr)
         if is_ad:
             payload = {
@@ -328,7 +320,6 @@ async def run_presence(
 
         await asyncio.sleep(poll_interval)
 
-    # Shutdown
     try:
         if lyrics_task:
             lyrics_task.cancel()

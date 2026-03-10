@@ -102,7 +102,6 @@ async def _read_media_session_async() -> Optional[Dict[str, Any]]:
         return None
 
     playback = spotify_session.get_playback_info()
-    # 4 = Playing (GlobalSystemMediaTransportControlsSessionPlaybackStatus.PLAYING)
     if int(playback.playback_status) != 4:
         return None
 
@@ -131,7 +130,6 @@ def _read_media_session_sync() -> Optional[Dict[str, Any]]:
     try:
         return asyncio.run(_read_media_session_async())
     except RuntimeError:
-        # Fallback if an event loop is already running in this thread.
         return None
     except Exception as e:
         log(f"Media session error: {e}", "DEBUG", "local")

@@ -44,27 +44,22 @@ def is_spotify_ad(current: dict) -> bool:
     if not current:
         return False
 
-    # Explicit type check
     if current.get("currently_playing_type") == "ad":
         return True
 
     item = current.get("item")
-    # Missing item usually means advertisement (or API anomaly)
     if not item:
         return True
 
-    # Name/artist heuristics
     name = (item.get("name") or "").lower()
     artists = item.get("artists") or [{}]
     artist_name = (artists[0].get("name") or "").lower()
 
-    # Trigger keywords
     ad_keywords = ["advert", "advertisement", "spotify", "ad"]
     for kw in ad_keywords:
         if kw in name or kw in artist_name:
             return True
 
-    # Very short tracks (< 30s) are often ads
     duration = item.get("duration_ms") or 0
     if 0 < duration < 30000:
         return True
