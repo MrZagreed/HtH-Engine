@@ -13,10 +13,10 @@ BAR_LEN = 14
 
 def _bar(progress: int, duration: int) -> str:
     if duration <= 0:
-        return "-" * BAR_LEN
+        return "▱" * BAR_LEN
     progress = max(0, min(progress, duration))
     filled = int(BAR_LEN * progress / max(1, duration))
-    return "#" * filled + "-" * (BAR_LEN - filled)
+    return "▰" * filled + "▱" * (BAR_LEN - filled)
 
 def _fmt_time(ms: int) -> str:
     ms = max(0, int(ms))
