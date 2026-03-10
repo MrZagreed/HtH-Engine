@@ -1,15 +1,15 @@
 # Highway to Hell Engine (Pre-release)
 
+[Русская версия](README_ru.md)
+
 Real-time Spotify -> Discord Rich Presence with synchronized lyrics.
 
 ## Zero-knowledge quick start
 1. Download/unpack this project anywhere.
 2. Run `run.py` (double-click) or use terminal:
    - `py -3.12 run.py`
-3. Choose a mode:
-   - `API` (Spotify Premium + Spotify API keys)
-   - `LOCAL` (no Premium required, Discord Client ID only)
-4. Follow the first-run setup wizard prompts.
+3. On first run, choose language first (`English` default, or `Russian`), then choose mode.
+4. Follow the setup wizard prompts.
 5. Done. The app auto-installs everything and starts.
 
 ## What is fully automatic
@@ -17,7 +17,7 @@ Real-time Spotify -> Discord Rich Presence with synchronized lyrics.
 - venv creation/recreation when needed
 - dependency installation from `requirements.txt`
 - re-exec inside venv
-- first-run setup wizard by selected mode
+- first-run setup wizard in EN/RU
 
 ## Project data locations
 Created automatically on first run:
@@ -79,6 +79,32 @@ Caching backend: SQLite (`lyrics_cache.db`).
 - image hover text: `Discord Karaoke RPC by Mr.Zagreed`
 - safe `Open in Spotify` button (URL validation)
 - throttled RPC update rate to avoid overload
+- pseudographic progress bar in Rich Presence
+
+## Network drop diagnostics
+- Tracks `online/degraded/offline` states
+- Logs outage duration, failure count, and last error
+- API mode applies adaptive backoff under unstable connection
+- Local mode continues tracking with reduced loop pressure
+
+## Authorship and license
+- Official author: `Mr.Zagreed`
+- Runtime attribution notice is automatically enforced in code
+- Tamper-evident authorship fingerprint is logged at startup
+- Redistribution must include `LICENSE`
+
+## Author story
+This project started in May 2025, when I was 19 and studying in my third year of college.
+After finishing my internship practice, I felt genuinely inspired to build something of my own.
+
+The first month produced a rough and unstable prototype. It worked, but barely.
+Instead of dropping it, I kept refining it step by step, turning a simple experiment into a serious long-term build.
+
+By the time of writing this story, I am 20 and finishing my fourth year.
+Today, Highway to Hell Engine represents that full journey: from a chaotic first idea to a polished release I am proud of.
+I hope it becomes useful to someone else out there.
+
+— Mr.Zagreed
 
 ## Troubleshooting
 1. Fully restart Discord
@@ -87,15 +113,3 @@ Caching backend: SQLite (`lyrics_cache.db`).
 
 ## Current pre-release version
 `0.9.0-pre`
-
-## Authorship and license
-- Official author: `Mr.Zagreed`
-- Runtime attribution notice is automatically enforced in code.
-- Tamper-evident authorship fingerprint is logged at startup.
-- License terms: see `LICENSE`.
-
-## Network drop diagnostics
-- The app now tracks online/degraded/offline network states.
-- During outages, logs include failure count, outage duration, and last network error.
-- API mode applies adaptive backoff under unstable connection.
-- Local mode continues playback tracking with reduced loop pressure.
