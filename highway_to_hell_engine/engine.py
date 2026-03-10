@@ -152,6 +152,7 @@ async def lyrics_engine(
     stagnation_count = 0
     last_idx = -1
     last_reported = init_reported_now
+    last_seek_resync_log_ts = 0.0
 
     # Main loop
     while not shutdown_event.is_set():
@@ -168,12 +169,33 @@ async def lyrics_engine(
             lag_ms = _clamp(now_ms - ts, -500, 1500)
             reported_now = max(0, progress + lag_ms)
 
-            # Protection against anomalous jumps
+            # Protection against anomalous jumps.
+            # Large backward jumps can be real seeks/restarts in local mode,
+            # so resync instead of freezing progress and spamming warnings.
             if reported_now < last_reported - 3000:
+                backward_delta = last_reported - reported_now
+                if backward_delta >= 15000 or reported_now <= 5000:
+                    now_ts = time.time()
+                    if now_ts - last_seek_resync_log_ts >= 3.0:
+                        log(
+                            f"Detected playback seek/restart: {last_reported} -> {reported_now}, resyncing timeline",
+                            "INFO",
+                            "engine",
+                        )
+                        last_seek_resync_log_ts = now_ts
+
+                    warp.reset()
+                    last_reported = reported_now
+                    init_reported_now = reported_now
+                    last_pushed_ms = reported_now
+                    last_push_wall = now_ts
+                    await push(reported_now, boundary=True, force_update=True)
+                    await asyncio.sleep(0.05)
+                    continue
+
                 log(f"Backward jump in reported progress: {last_reported} -> {reported_now}, forcing snap", "WARNING", "engine")
                 reported_now = last_reported
             last_reported = reported_now
-
             shown_estimate = last_pushed_ms if last_pushed_ms is not None else reported_now
             dt = (time.time() - last_push_wall) * 1000.0
             shown_estimate = max(0, int(shown_estimate + dt))
@@ -243,3 +265,5 @@ async def lyrics_engine(
         f"time corrections={warp.total_corrections}",
         "INFO", "engine"
     )
+
+
