@@ -37,6 +37,23 @@ def _safe_spotify_url(url: str) -> Optional[str]:
     except Exception:
         return None
 
+
+def _compose_rpc_state(lyrics_state: str, footer: str) -> str:
+    """Compose Discord `state` within 128 chars, preserving footer readability."""
+    footer = (footer or "").strip()
+    if len(footer) >= 128:
+        return footer[:128]
+
+    available = 128 - len(footer) - 1  # newline between lyrics and footer
+    body = (lyrics_state or "").strip("\n")
+
+    if available <= 0:
+        return footer[:128]
+
+    if len(body) > available:
+        body = body[: max(1, available - 1)].rstrip() + "…"
+
+    return f"{body}\n{footer}"[:128]
 async def lyrics_engine(
     song: str,
     artist: str,
@@ -50,7 +67,13 @@ async def lyrics_engine(
     get_track_func: Callable[[], Optional[Dict[str, Any]]],
     config: dict  # config parameter
 ):
-    display = SmartLyricsDisplay(min_interval_s=0.2)
+    display = SmartLyricsDisplay(
+        max_lines=int(config.get("lyrics_rpc_lines", 3)),
+        max_line_length=int(config.get("lyrics_rpc_line_length", 26)),
+        min_interval_s=float(config.get("lyrics_rpc_render_interval", 0.2)),
+        page_flip_interval_s=float(config.get("lyrics_rpc_page_flip_interval", 0.9)),
+        next_preview_ratio=float(config.get("lyrics_rpc_next_preview_ratio", 0.5)),
+    )
     warp = TimeWarp(
         max_drift_ms=config.get("max_drift_ms", 7000),
         aggressive_correction=config.get("aggressive_correction", True)
@@ -87,7 +110,7 @@ async def lyrics_engine(
 
         payload: Dict[str, Any] = {
             "details": f"{artist} - {song}"[:128],
-            "state": f"{state}\n{bar} {time_txt}{suffix}"[:128],
+            "state": _compose_rpc_state(state, f"{bar} {time_txt}{suffix}"),
             "instance": True
         }
 
@@ -257,5 +280,7 @@ async def lyrics_engine(
         f"time corrections={warp.total_corrections}",
         "INFO", "engine"
     )
+
+
 
 

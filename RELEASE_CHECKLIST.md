@@ -22,4 +22,7 @@
 
 Notes:
 - Release guard fails if it detects tracked local artifacts or potential hardcoded secrets.
-- `LICENSE` must be included in any redistribution.
+- `LICENSE` and `NOTICE` must be included in any redistribution.
+
+- Release guard also verifies required authorship markers before release.
+

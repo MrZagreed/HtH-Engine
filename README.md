@@ -93,7 +93,7 @@ Caching backend: SQLite (`lyrics_cache.db`).
 - Official author: `Mr.Zagreed`
 - Runtime attribution notice is automatically enforced in code
 - Tamper-evident authorship fingerprint is logged at startup
-- Redistribution must include `LICENSE`
+- Redistribution must include `LICENSE` and `NOTICE`
 
 ## Author story
 
@@ -124,7 +124,4 @@ March 10, 2026
 
 ## Current release version
 `1.0.0`
-
-
-
 

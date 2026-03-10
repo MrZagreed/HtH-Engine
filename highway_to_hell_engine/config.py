@@ -22,6 +22,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "heartbeat_interval": 9.5,
     "max_drift_ms": 7000,
     "aggressive_correction": True,
+    "lyrics_rpc_lines": 3,
+    "lyrics_rpc_line_length": 26,
+    "lyrics_rpc_render_interval": 0.2,
+    "lyrics_rpc_page_flip_interval": 0.9,
+    "lyrics_rpc_next_preview_ratio": 0.5,
 }
 
 I18N: Dict[str, Dict[str, str]] = {
@@ -193,3 +198,4 @@ def load_or_create_config(mode: str = "api", lang: str = "en") -> Dict[str, Any]
     CONFIG_FILE.write_text(json.dumps(prepared, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"{_t(lang, 'saved')} {CONFIG_FILE}")
     return prepared
+

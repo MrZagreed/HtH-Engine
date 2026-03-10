@@ -31,6 +31,29 @@ FORBIDDEN_CONTENT_PATTERNS = [
     r"(?i)discord_client_id\s*[:=]\s*['\"]\d{18,19}['\"]",
 ]
 
+REQUIRED_MARKERS: dict[str, list[str]] = {
+    "LICENSE": [
+        r"(?i)copyright \(c\)\s*2026\s*mr\.zagreed",
+        r"(?i)remove, alter, or hide the original authorship attribution",
+    ],
+    "NOTICE": [
+        r"(?i)hth engine notice",
+        r"(?i)copyright \(c\)\s*2026\s*mr\.zagreed",
+    ],
+    "highway_to_hell_engine/authorship.py": [
+        r"AUTHOR_NAME\s*=\s*\"Mr\.Zagreed\"",
+        r"AUTHOR_NOTICE\s*=\s*\"Discord Karaoke RPC by Mr\.Zagreed\"",
+    ],
+    "README.md": [
+        r"## Authorship and license",
+        r"`LICENSE`",
+    ],
+    "README_ru.md": [
+        r"## Авторство и лицензия",
+        r"`LICENSE`",
+    ],
+}
+
 
 def run_git(args: Iterable[str]) -> str:
     proc = subprocess.run(
@@ -110,6 +133,34 @@ def create_archive(version: str) -> pathlib.Path:
     run_git(["archive", "--format", "zip", "-o", str(out), "HEAD"])
     return out
 
+def check_required_markers(files: list[str]) -> None:
+    tracked = set(files)
+    errors: list[str] = []
+
+    for rel, patterns in REQUIRED_MARKERS.items():
+        if rel not in tracked:
+            errors.append(f"{rel}: file is missing from tracked release files")
+            continue
+
+        p = ROOT / rel
+        if not p.is_file():
+            errors.append(f"{rel}: file not found on disk")
+            continue
+
+        try:
+            text = p.read_text(encoding="utf-8")
+        except Exception as e:
+            errors.append(f"{rel}: cannot read file ({e})")
+            continue
+
+        missing = [pat for pat in patterns if not re.search(pat, text)]
+        if missing:
+            errors.append(f"{rel}: missing required authorship markers")
+
+    if errors:
+        joined = "\n".join(f"  - {x}" for x in errors)
+        raise RuntimeError(f"Authorship/copyright checks failed:\n{joined}")
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Safe release guard for HtH Engine")
@@ -129,6 +180,7 @@ def main() -> int:
         files = tracked_files()
         scan_paths(files)
         scan_contents(files)
+        check_required_markers(files)
 
         print(f"Release guard OK for version {version}")
 
@@ -145,3 +197,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
