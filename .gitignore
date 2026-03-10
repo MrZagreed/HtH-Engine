@@ -32,3 +32,6 @@ Thumbs.db
 # Legacy local folders
 duality_venv/
 duality_data/
+
+# Release artifacts
+dist/

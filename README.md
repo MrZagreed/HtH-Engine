@@ -1,4 +1,4 @@
-# HtH Engine (Pre-release)
+# HtH Engine (Release)
 
 [Русская версия](README_ru.md)
 
@@ -122,8 +122,13 @@ March 10, 2026
 2. Restart app
 3. Check latest `logs/debug_*.log`
 
-## Current pre-release version
-`0.9.0-pre`
+## Current release version
+`1.0.0`
 
 
 
+
+## Safe release
+1. Run: `py -3.12 scripts/release_guard.py --create-archive`
+2. Follow: `RELEASE_CHECKLIST.md`
+3. Publish tag `v1.0.0` and upload `dist/hth-engine-v1.0.0.zip`

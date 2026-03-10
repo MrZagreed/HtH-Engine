@@ -1,0 +1,12 @@
+# Exclude local/editor/runtime artifacts from git archive release bundles
+.codex/ export-ignore
+.vscode/ export-ignore
+.idea/ export-ignore
+logs/ export-ignore
+highway_to_hell_engine_data/ export-ignore
+duality_data/ export-ignore
+highway_to_hell_engine_venv/ export-ignore
+duality_venv/ export-ignore
+
+# Keep release helper scripts out of end-user source archive
+scripts/ export-ignore
